@@ -1,95 +1,103 @@
-import { StatusBar, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native';
+
+import { ActionButton } from './src/components/ActionButton';
+import { ArtisanFlow } from './src/screens/ArtisanFlow';
+import { OnboardingFlow } from './src/screens/OnboardingFlow';
+import { SignInFlow } from './src/screens/SignInFlow';
+import { SignupFlow } from './src/screens/SignupFlow';
+import { colors } from './src/theme/colors';
+
+type AppScreen =
+  | 'onboarding'
+  | 'signup'
+  | 'signin'
+  | 'artisanSignup'
+  | 'dashboard';
 
 function App() {
-  return (
-    <View style={styles.container}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor="#FFF8F8"
+  const [screen, setScreen] = useState<AppScreen>('onboarding');
+
+  if (screen === 'signup') {
+    return (
+      <SignupFlow
+        onDashboard={() => setScreen('dashboard')}
+        onSignIn={() => setScreen('signin')}
       />
+    );
+  }
 
-      <View style={styles.glowTop} />
-      <View style={styles.glowBottom} />
+  if (screen === 'signin') {
+    return (
+      <SignInFlow
+        onDashboard={() => setScreen('dashboard')}
+        onSignUp={() => setScreen('signup')}
+      />
+    );
+  }
 
-      <View accessibilityRole="header" style={styles.brand}>
-        <Text style={styles.mark}>bw</Text>
-        <View style={styles.wordmark}>
-          <Text style={styles.beta}>Beta</Text>
-          <Text style={styles.a}>a</Text>
-          <Text style={styles.work}>Work</Text>
+  if (screen === 'artisanSignup') {
+    return (
+      <ArtisanFlow
+        onDashboard={() => setScreen('dashboard')}
+        onSignIn={() => setScreen('signin')}
+      />
+    );
+  }
+
+  if (screen === 'dashboard') {
+    return (
+      <SafeAreaView style={styles.dashboard}>
+        <StatusBar
+          backgroundColor={colors.background}
+          barStyle="dark-content"
+        />
+        <View style={styles.dashboardContent}>
+          <Text style={styles.dashboardTitle}>Welcome to Beta Work!</Text>
+          <Text style={styles.dashboardBody}>
+            You’re signed in. Explore trusted artisans near you.
+          </Text>
+          <ActionButton onPress={() => setScreen('onboarding')}>
+            Restart demo
+          </ActionButton>
         </View>
-      </View>
+      </SafeAreaView>
+    );
+  }
 
-      <Text style={styles.tagline}>Work better. Grow further.</Text>
-    </View>
+  return (
+    <OnboardingFlow
+      onCreateAccount={() => setScreen('signup')}
+      onLogin={() => setScreen('signin')}
+      onOfferService={() => setScreen('artisanSignup')}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    backgroundColor: '#FFF8F8',
+  dashboard: {
+    backgroundColor: colors.background,
     flex: 1,
+  },
+  dashboardContent: {
+    flex: 1,
+    gap: 16,
     justifyContent: 'center',
-    overflow: 'hidden',
+    paddingHorizontal: 24,
   },
-  glowTop: {
-    backgroundColor: '#FFE4E4',
-    borderRadius: 190,
-    height: 380,
-    position: 'absolute',
-    right: -220,
-    top: -190,
-    width: 380,
-  },
-  glowBottom: {
-    backgroundColor: '#FDEEEE',
-    borderRadius: 150,
-    bottom: -180,
-    height: 300,
-    left: -170,
-    position: 'absolute',
-    width: 300,
-  },
-  brand: {
-    alignItems: 'center',
-  },
-  mark: {
-    color: '#151515',
-    fontSize: 74,
-    fontWeight: '300',
-    letterSpacing: -9,
-    lineHeight: 78,
-  },
-  wordmark: {
-    alignItems: 'baseline',
-    flexDirection: 'row',
-    marginTop: 2,
-  },
-  beta: {
-    color: '#D71920',
-    fontSize: 28,
+  dashboardTitle: {
+    color: colors.textPrimary,
+    fontSize: 24,
     fontWeight: '600',
-    letterSpacing: -1,
+    lineHeight: 29,
+    textAlign: 'center',
   },
-  a: {
-    color: '#D71920',
-    fontSize: 28,
-    fontWeight: '600',
-    letterSpacing: -1,
-  },
-  work: {
-    color: '#151515',
-    fontSize: 28,
-    fontWeight: '600',
-    letterSpacing: -1,
-  },
-  tagline: {
-    bottom: 52,
-    color: '#6D6464',
-    fontSize: 13,
-    letterSpacing: 0.7,
-    position: 'absolute',
+  dashboardBody: {
+    color: colors.textSecondary,
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 24,
+    textAlign: 'center',
   },
 });
 
