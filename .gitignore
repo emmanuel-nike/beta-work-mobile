@@ -21,6 +21,7 @@ DerivedData
 *.ipa
 *.xcuserstate
 **/.xcode.env.local
+*.p8
 
 # Android/IntelliJ
 #
@@ -65,6 +66,10 @@ yarn-error.log
 
 # testing
 /coverage
+
+# Env
+.env
+.env.local
 
 # Yarn
 .yarn/*

@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -15,13 +16,21 @@ import {
 
 import AddressIcon from '../../assets/images/address.svg';
 import BackIcon from '../../assets/images/back.svg';
-import CameraIcon from '../../assets/images/camera.svg';
 import EmailIcon from '../../assets/images/email.svg';
 import OtpArtwork from '../../assets/images/otp.png';
 import PasswordIcon from '../../assets/images/password.svg';
 import PhoneIcon from '../../assets/images/phone.svg';
 import SuccessArtwork from '../../assets/images/signup-success.png';
 import UserIcon from '../../assets/images/user.svg';
+import {
+  buildValidatePayloadFromForm,
+  registerUser,
+  sendOtp,
+  validateUser,
+  verifyOtp,
+} from '../api/auth';
+import { ApiError } from '../api/client';
+import { splitFullName, toE164Phone } from '../api/phone';
 import { ActionButton } from '../components/ActionButton';
 import { FormField } from '../components/FormField';
 import { colors } from '../theme/colors';
@@ -66,25 +75,31 @@ export function SignupFlow({
   onSignIn = () => {},
 }: SignupFlowProps) {
   const [step, setStep] = useState<SignupStep>('details');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [form, setForm] = useState(INITIAL_FORM);
+  const [otp, setOtp] = useState('');
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar backgroundColor={colors.background} barStyle="dark-content" />
       {step === 'details' ? (
         <SignupDetails
-          onContinue={phone => {
-            setPhoneNumber(phone);
+          form={form}
+          onContinue={(nextForm, nextOtp) => {
+            setForm(nextForm);
+            setOtp(nextOtp);
             setStep('verification');
           }}
+          onFormChange={setForm}
           onSignIn={onSignIn}
         />
       ) : null}
       {step === 'verification' ? (
         <VerificationScreen
+          form={form}
+          initialOtp={otp}
           onBack={() => setStep('details')}
+          onOtpChange={setOtp}
           onVerified={() => setStep('success')}
-          phoneNumber={phoneNumber}
         />
       ) : null}
       {step === 'success' ? <SuccessScreen onDashboard={onDashboard} /> : null}
@@ -93,21 +108,27 @@ export function SignupFlow({
 }
 
 function SignupDetails({
+  form,
+  onFormChange,
   onContinue,
   onSignIn,
 }: Readonly<{
-  onContinue: (phone: string) => void;
+  form: FormState;
+  onFormChange: (form: FormState) => void;
+  onContinue: (form: FormState, otp: string) => void;
   onSignIn: () => void;
 }>) {
-  const [form, setForm] = useState(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<FormState>>({});
+  const [submitError, setSubmitError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateField = (field: keyof FormState, value: string) => {
-    setForm(current => ({ ...current, [field]: value }));
+    onFormChange({ ...form, [field]: value });
     setErrors(current => ({ ...current, [field]: undefined }));
+    setSubmitError('');
   };
 
-  const submit = () => {
+  const submit = async () => {
     const nextErrors: Partial<FormState> = {};
     const emailIsValid = isValidEmail(form.email);
 
@@ -125,21 +146,37 @@ function SignupDetails({
     }
 
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length === 0) {
-      onContinue(form.phone);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const payload = buildValidatePayloadFromForm(form);
+      await validateUser(payload);
+      const otpResponse = await sendOtp(form.phone);
+      onContinue(form, otpResponse.otp);
+    } catch (error) {
+      setSubmitError(
+        error instanceof ApiError
+          ? error.message
+          : 'Unable to start signup. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.flex}
-    >
+      style={styles.flex}>
       <ScrollView
         contentContainerStyle={styles.signupContent}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+        showsVerticalScrollIndicator={false}>
         <StepIndicator step={1} />
 
         <View style={styles.signupHeading}>
@@ -148,21 +185,6 @@ function SignupDetails({
             Join Beta Work! to connect with trusted professionals near you.
           </Text>
         </View>
-
-        {/* <Pressable
-          accessibilityLabel="Upload profile picture"
-          accessibilityRole="button"
-          style={styles.photoSection}>
-          <View style={styles.photoCircle}>
-            <CameraIcon height={28} width={28} />
-          </View>
-          <View style={styles.photoCopy}>
-            <Text style={styles.photoTitle}>Upload picture</Text>
-            <Text style={styles.photoDescription}>
-              Add a clear photo of yourself
-            </Text>
-          </View>
-        </Pressable> */}
 
         <View style={styles.form}>
           <FormField
@@ -225,9 +247,17 @@ function SignupDetails({
           />
         </View>
 
-        <ActionButton onPress={submit} style={styles.getStartedButton}>
-          Get started
+        {submitError ? <Text style={styles.submitError}>{submitError}</Text> : null}
+
+        <ActionButton
+          disabled={isSubmitting}
+          onPress={submit}
+          style={styles.getStartedButton}>
+          {isSubmitting ? 'Please wait...' : 'Get started'}
         </ActionButton>
+        {isSubmitting ? (
+          <ActivityIndicator color={colors.primary} style={styles.loader} />
+        ) : null}
 
         <Text style={styles.terms}>
           By clicking the “Get started” button, you agree to our{' '}
@@ -245,25 +275,87 @@ function SignupDetails({
 }
 
 function VerificationScreen({
-  phoneNumber,
+  form,
+  initialOtp,
   onBack,
+  onOtpChange,
   onVerified,
 }: Readonly<{
-  phoneNumber: string;
+  form: FormState;
+  initialOtp: string;
   onBack: () => void;
+  onOtpChange: (otp: string) => void;
   onVerified: () => void;
 }>) {
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(initialOtp.replace(/\D/g, '').slice(0, 6));
   const [hasError, setHasError] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const displayPhone = phoneNumber || '0801 234 5678';
+  const displayPhone = toE164Phone(form.phone);
 
-  const verify = () => {
-    if (code === '123456') {
-      onVerified();
+  useEffect(() => {
+    const nextCode = initialOtp.replace(/\D/g, '').slice(0, 6);
+    setCode(nextCode);
+  }, [initialOtp]);
+
+  const updateCode = (value: string) => {
+    const next = value.replace(/\D/g, '').slice(0, 6);
+    setCode(next);
+    onOtpChange(next);
+    setHasError(false);
+    setSubmitError('');
+  };
+
+  const resend = async () => {
+    setIsSubmitting(true);
+    setSubmitError('');
+    try {
+      const response = await sendOtp(form.phone);
+      updateCode(response.otp);
+    } catch (error) {
+      setSubmitError(
+        error instanceof ApiError
+          ? error.message
+          : 'Unable to resend code. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const verify = async () => {
+    if (code.length !== 6) {
       return;
     }
-    setHasError(true);
+
+    setIsSubmitting(true);
+    setSubmitError('');
+    setHasError(false);
+
+    try {
+      await verifyOtp(form.phone, code);
+      const { firstName, lastName } = splitFullName(form.fullName);
+      await registerUser({
+        firstName,
+        lastName,
+        email: form.email.trim(),
+        phoneNumber: form.phone,
+        password: form.password,
+        address: form.address.trim() || undefined,
+        role: 'user',
+      });
+      onVerified();
+    } catch (error) {
+      setHasError(true);
+      setSubmitError(
+        error instanceof ApiError
+          ? error.message
+          : 'Unable to verify phone number. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -273,8 +365,7 @@ function VerificationScreen({
           accessibilityLabel="Go back"
           accessibilityRole="button"
           onPress={onBack}
-          style={styles.backButton}
-        >
+          style={styles.backButton}>
           <BackIcon height={18} width={18} />
         </Pressable>
         <StepIndicator step={2} />
@@ -298,14 +389,12 @@ function VerificationScreen({
       <Pressable
         accessibilityLabel="Enter six-digit verification code"
         onPress={() => inputRef.current?.focus()}
-        style={styles.otpArea}
-      >
+        style={styles.otpArea}>
         <View style={styles.otpRow}>
           {Array.from({ length: 6 }).map((_, index) => (
             <View
-              key={index}
-              style={[styles.otpBox, hasError && styles.otpBoxError]}
-            >
+              key={`otp-${index}`}
+              style={[styles.otpBox, hasError && styles.otpBoxError]}>
               <Text style={styles.otpDigit}>{code[index] ?? ''}</Text>
             </View>
           ))}
@@ -316,41 +405,30 @@ function VerificationScreen({
           caretHidden
           keyboardType="number-pad"
           maxLength={6}
-          onChangeText={value => {
-            setCode(value.replace(/\D/g, ''));
-            setHasError(false);
-          }}
+          onChangeText={updateCode}
           style={styles.hiddenOtpInput}
           value={code}
         />
       </Pressable>
 
-      {hasError ? (
+      {hasError || submitError ? (
         <Text style={styles.otpError}>
-          Verification code is incorrect. Please try again
+          {submitError || 'Verification code is incorrect. Please try again'}
         </Text>
       ) : null}
 
       <Text style={styles.expiry}>
-        This code will expire in 02:59{' '}
-        <Text
-          onPress={() => {
-            setCode('');
-            setHasError(false);
-            inputRef.current?.focus();
-          }}
-          style={styles.link}
-        >
+        This code will expire in 10:00{' '}
+        <Text onPress={resend} style={styles.link}>
           Resend
         </Text>
       </Text>
 
       <ActionButton
-        disabled={code.length !== 6}
+        disabled={code.length !== 6 || isSubmitting}
         onPress={verify}
-        style={styles.verifyButton}
-      >
-        Verify
+        style={styles.verifyButton}>
+        {isSubmitting ? 'Verifying...' : 'Verify'}
       </ActionButton>
 
       <Text style={styles.incorrectNumber}>
@@ -387,8 +465,7 @@ function StepIndicator({ step }: Readonly<{ step: 1 | 2 }>) {
   return (
     <View
       accessibilityLabel={`Signup step ${step} of 2`}
-      style={styles.stepIndicator}
-    >
+      style={styles.stepIndicator}>
       <View style={styles.stepTrack}>
         <View
           style={[
@@ -461,41 +538,21 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     textAlign: 'center',
   },
-  photoSection: {
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 39,
-  },
-  photoCircle: {
-    alignItems: 'center',
-    borderColor: colors.formBorder,
-    borderRadius: 50,
-    borderWidth: 1.25,
-    height: 100,
-    justifyContent: 'center',
-    width: 100,
-  },
-  photoCopy: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  photoTitle: {
-    color: colors.formLabel,
-    fontSize: 16,
-    fontWeight: '500',
-    lineHeight: 24,
-  },
-  photoDescription: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 13,
-  },
   form: {
     gap: 20,
     marginTop: 20,
   },
   getStartedButton: {
     marginTop: 48,
+  },
+  submitError: {
+    color: colors.error,
+    fontSize: 13,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  loader: {
+    marginTop: 12,
   },
   terms: {
     color: colors.textPrimary,

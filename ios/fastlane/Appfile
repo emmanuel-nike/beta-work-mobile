@@ -1,0 +1,7 @@
+app_identifier("com.betaworkmobile") # Your App Store Connect Bundle ID
+apple_id("emmanueln_nike@hotmail.com")     # Your Apple Developer Portal Email
+
+# Optional: You can explicitly target different IDs for different lanes
+for_lane :release do
+  app_identifier("com.betaworkmobile")
+end

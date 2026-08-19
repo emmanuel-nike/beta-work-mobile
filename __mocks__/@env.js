@@ -1,0 +1,3 @@
+module.exports = {
+  API_BASE_URL: 'https://betawork.arknotify.io/api/v1',
+};

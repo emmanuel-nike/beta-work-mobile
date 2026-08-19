@@ -1,0 +1,53 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Release the app to the App Store"
+  lane :release do
+    # 1. Authenticate with App Store Connect API
+    api_key = app_store_connect_api_key(
+      key_id: "B842TCUH7K",
+      issuer_id: "dff63a2a-d197-4f33-b324-0961d113c4f5",
+      key_filepath: "./fastlane/AuthKey_B842TCUH7K.p8"
+    )
+
+    # 2. Fetch or create signing certificates & profiles automatically
+    # Note: Requires setting up fastlane match or standard cert/sigh tools
+    cert
+    sigh(force: true)
+
+    # 3. Increment the build number to avoid Apple duplicate errors
+    increment_build_number(
+      build_number: latest_testflight_build_number(api_key: api_key) + 1
+    )
+
+    # 4. Clean and build the iOS app binary (.ipa file)
+    build_app(
+      scheme: "BetaWork",       # Your Xcode scheme name
+      workspace: "BetaWork.xcworkspace", # Or YourApp.xcodeproj if not using CocoaPods
+      export_method: "app-store"
+    )
+
+    # 5. Upload the built binary and submit for App Store review
+    upload_to_app_store(
+      api_key: api_key,
+      skip_metadata: false,          # Set to true if managing metadata on the web portal instead
+      skip_screenshots: false,       # Set to true if managing screenshots manually
+      submit_for_review: false       # Set to true to automatically click submit for review
+    )
+  end
+end

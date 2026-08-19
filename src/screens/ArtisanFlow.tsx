@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -26,6 +27,14 @@ import OtpArtwork from '../../assets/images/otp.png';
 import PasswordIcon from '../../assets/images/password.svg';
 import PhoneIcon from '../../assets/images/phone.svg';
 import UserIcon from '../../assets/images/user.svg';
+import {
+  buildValidatePayloadFromForm,
+  sendOtp,
+  validateUser,
+  verifyOtp,
+} from '../api/auth';
+import { ApiError } from '../api/client';
+import { toE164Phone } from '../api/phone';
 import { ActionButton } from '../components/ActionButton';
 import { FormField } from '../components/FormField';
 import { ProgressBar } from '../components/ProgressBar';
@@ -116,6 +125,7 @@ export function ArtisanFlow({
   const [step, setStep] = useState<SignupStep>('details');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [fullName, setFullName] = useState('');
+  const [otp, setOtp] = useState('');
 
   const panResponder = useMemo(
     () =>
@@ -173,9 +183,10 @@ export function ArtisanFlow({
       />
       {step === 'details' ? (
         <ArtisanDetails
-          onContinue={(phone, name) => {
+          onContinue={(phone, name, nextOtp) => {
             setPhoneNumber(phone);
             setFullName(name);
+            setOtp(nextOtp);
             setStep('verification');
           }}
           onSignIn={onSignIn}
@@ -183,7 +194,9 @@ export function ArtisanFlow({
       ) : null}
       {step === 'verification' ? (
         <VerificationStep
+          initialOtp={otp}
           onBack={() => setStep('details')}
+          onOtpChange={setOtp}
           onVerified={() => setStep('identity')}
           phoneNumber={phoneNumber}
         />
@@ -214,7 +227,7 @@ function ArtisanDetails({
   onContinue,
   onSignIn,
 }: Readonly<{
-  onContinue: (phone: string, fullName: string) => void;
+  onContinue: (phone: string, fullName: string, otp: string) => void;
   onSignIn: () => void;
 }>) {
   const [fullName, setFullName] = useState('');
@@ -224,8 +237,9 @@ function ArtisanDetails({
   const [address, setAddress] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const submit = () => {
+  const submit = async () => {
     if (
       !fullName.trim() ||
       phone.replace(/\D/g, '').length < 10 ||
@@ -236,8 +250,30 @@ function ArtisanDetails({
       setError('Please complete all required fields to continue.');
       return;
     }
+
+    setIsSubmitting(true);
     setError('');
-    onContinue(phone, fullName);
+
+    try {
+      await validateUser(
+        buildValidatePayloadFromForm({
+          fullName,
+          email,
+          phone,
+          address,
+        }),
+      );
+      const otpResponse = await sendOtp(phone);
+      onContinue(phone, fullName, otpResponse.otp);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to start signup. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -307,9 +343,15 @@ function ArtisanDetails({
           />
         </View>
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <ActionButton onPress={submit} style={styles.submitButton}>
-          Continue
+        <ActionButton
+          disabled={isSubmitting}
+          onPress={submit}
+          style={styles.submitButton}>
+          {isSubmitting ? 'Please wait...' : 'Continue'}
         </ActionButton>
+        {isSubmitting ? (
+          <ActivityIndicator color={colors.primary} style={styles.loader} />
+        ) : null}
         <Text style={styles.terms}>
           By clicking the “Continue” button below, you agree to our{' '}
           <Text style={styles.link}>Terms of Service</Text> and{' '}
@@ -327,25 +369,76 @@ function ArtisanDetails({
 }
 
 function VerificationStep({
+  initialOtp,
   onBack,
+  onOtpChange,
   onVerified,
   phoneNumber,
 }: Readonly<{
+  initialOtp: string;
   onBack: () => void;
+  onOtpChange: (otp: string) => void;
   onVerified: () => void;
   phoneNumber: string;
 }>) {
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(initialOtp.replace(/\D/g, '').slice(0, 6));
   const [hasError, setHasError] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const displayPhone = phoneNumber || '0801 234 5678';
+  const displayPhone = toE164Phone(phoneNumber);
 
-  const verify = () => {
-    if (code === '123456') {
-      onVerified();
+  useEffect(() => {
+    setCode(initialOtp.replace(/\D/g, '').slice(0, 6));
+  }, [initialOtp]);
+
+  const updateCode = (value: string) => {
+    const next = value.replace(/\D/g, '').slice(0, 6);
+    setCode(next);
+    onOtpChange(next);
+    setHasError(false);
+    setSubmitError('');
+  };
+
+  const resend = async () => {
+    setIsSubmitting(true);
+    setSubmitError('');
+    try {
+      const response = await sendOtp(phoneNumber);
+      updateCode(response.otp);
+    } catch (err) {
+      setSubmitError(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to resend code. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const verify = async () => {
+    if (code.length !== 6) {
       return;
     }
-    setHasError(true);
+
+    setIsSubmitting(true);
+    setHasError(false);
+    setSubmitError('');
+
+    try {
+      await verifyOtp(phoneNumber, code);
+      onVerified();
+    } catch (err) {
+      setHasError(true);
+      setSubmitError(
+        err instanceof ApiError
+          ? err.message
+          : 'Verification code is incorrect. Please try again',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -385,10 +478,7 @@ function VerificationStep({
           caretHidden
           keyboardType="number-pad"
           maxLength={6}
-          onChangeText={value => {
-            setCode(value.replace(/\D/g, ''));
-            setHasError(false);
-          }}
+          onChangeText={updateCode}
           style={styles.hiddenInput}
           value={code}
         />
@@ -398,27 +488,22 @@ function VerificationStep({
         immediately, please wait a few seconds or tap resend.
       </Text>
       <Text style={styles.expiry}>
-        This code will expire in 00:59{' '}
-        <Text
-          onPress={() => {
-            setCode('');
-            setHasError(false);
-            inputRef.current?.focus();
-          }}
-          style={styles.link}>
+        This code will expire in 10:00{' '}
+        <Text onPress={resend} style={styles.link}>
           Resend
         </Text>
       </Text>
-      {hasError ? (
+      {hasError || submitError ? (
         <Text style={styles.centerError}>
-          Verification code is incorrect. Please try again
+          {submitError ||
+            'Verification code is incorrect. Please try again'}
         </Text>
       ) : null}
       <ActionButton
-        disabled={code.length !== 6}
+        disabled={code.length !== 6 || isSubmitting}
         onPress={verify}
         style={styles.verifyButton}>
-        Verify
+        {isSubmitting ? 'Verifying...' : 'Verify'}
       </ActionButton>
       <Text style={styles.bottomLink}>
         Incorrect phone number?{' '}
@@ -911,6 +996,9 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: 36,
+  },
+  loader: {
+    marginTop: 12,
   },
   error: {
     color: colors.error,
