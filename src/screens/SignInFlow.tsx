@@ -21,6 +21,15 @@ import ResetEmailArtwork from '../../assets/images/reset-email.png';
 import SuccessArtwork from '../../assets/images/signup-success.png';
 import { ActionButton } from '../components/ActionButton';
 import { FormField } from '../components/FormField';
+import { useOtpResendCountdown } from '../hooks/useOtpResendCountdown';
+import { usePreAuthNavigation } from '../navigation/types';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import {
+  clearAuthError,
+  loginUser,
+  selectAuthError,
+  selectAuthStatus,
+} from '../store/slices/authSlice';
 import { colors } from '../theme/colors';
 
 type SignInStep =
@@ -29,11 +38,6 @@ type SignInStep =
   | 'resetVerify'
   | 'resetPassword'
   | 'resetSuccess';
-
-type SignInFlowProps = Readonly<{
-  onSignUp?: () => void;
-  onDashboard?: () => void;
-}>;
 
 const isValidEmail = (value: string) => {
   const atIndex = value.indexOf('@');
@@ -47,10 +51,8 @@ const isValidEmail = (value: string) => {
   );
 };
 
-export function SignInFlow({
-  onSignUp = () => {},
-  onDashboard = () => {},
-}: SignInFlowProps) {
+export function SignInFlow() {
+  const navigation = usePreAuthNavigation();
   const [step, setStep] = useState<SignInStep>('login');
   const [resetPhone, setResetPhone] = useState('0801 234 5678');
 
@@ -63,8 +65,7 @@ export function SignInFlow({
       {step === 'login' ? (
         <LoginScreen
           onForgotPassword={() => setStep('resetEmail')}
-          onLogin={onDashboard}
-          onSignUp={onSignUp}
+          onSignUp={() => navigation.navigate('Signup')}
         />
       ) : null}
       {step === 'resetEmail' ? (
@@ -95,16 +96,18 @@ export function SignInFlow({
 
 function LoginScreen({
   onForgotPassword,
-  onLogin,
   onSignUp,
 }: Readonly<{
   onForgotPassword: () => void;
-  onLogin: () => void;
   onSignUp: () => void;
 }>) {
+  const dispatch = useAppDispatch();
+  const authStatus = useAppSelector(selectAuthStatus);
+  const authError = useAppSelector(selectAuthError);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState<string>();
+  const isSubmitting = authStatus === 'loading';
 
   const submit = () => {
     if (!isValidEmail(email)) {
@@ -114,7 +117,7 @@ function LoginScreen({
     if (!password) {
       return;
     }
-    onLogin();
+    dispatch(loginUser({ email, password }));
   };
 
   return (
@@ -141,6 +144,7 @@ function LoginScreen({
             onChangeText={value => {
               setEmail(value);
               setEmailError(undefined);
+              dispatch(clearAuthError());
             }}
             placeholder="Enter your email"
             textContentType="emailAddress"
@@ -152,15 +156,22 @@ function LoginScreen({
             icon={PasswordIcon}
             isPassword
             label="Password"
-            onChangeText={setPassword}
+            onChangeText={value => {
+              setPassword(value);
+              dispatch(clearAuthError());
+            }}
             placeholder="Type your password here"
             textContentType="password"
             value={password}
           />
         </View>
 
+        {authError ? <Text style={styles.otpError}>{authError}</Text> : null}
+
         <View style={styles.loginActions}>
-          <ActionButton onPress={submit}>Login</ActionButton>
+          <ActionButton disabled={isSubmitting} onPress={submit}>
+            {isSubmitting ? 'Please wait...' : 'Login'}
+          </ActionButton>
           <ActionButton onPress={onForgotPassword} variant="outlined">
             Forgot password?
           </ActionButton>
@@ -248,6 +259,8 @@ function ResetEmailScreen({
   );
 }
 
+const RESET_OTP_EXPIRY_SECONDS = 300;
+
 function ResetVerifyScreen({
   phoneNumber,
   setPhoneNumber,
@@ -261,7 +274,24 @@ function ResetVerifyScreen({
 }>) {
   const [code, setCode] = useState('');
   const [hasError, setHasError] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const { canResend, formattedTime, resetCountdown } = useOtpResendCountdown(
+    RESET_OTP_EXPIRY_SECONDS,
+  );
+
+  const resend = () => {
+    if (!canResend || isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setCode('');
+    setHasError(false);
+    inputRef.current?.focus();
+    resetCountdown();
+    setIsSubmitting(false);
+  };
 
   const verify = () => {
     if (code === '123456') {
@@ -356,14 +386,10 @@ function ResetVerifyScreen({
       )}
 
       <Text style={styles.expiry}>
-        This code will expire in 04:59{' '}
+        This code will expire in {formattedTime}{' '}
         <Text
-          onPress={() => {
-            setCode('');
-            setHasError(false);
-            inputRef.current?.focus();
-          }}
-          style={styles.link}>
+          onPress={canResend && !isSubmitting ? resend : undefined}
+          style={[styles.link, !canResend && styles.linkDisabled]}>
           Resend
         </Text>
       </Text>
@@ -561,6 +587,9 @@ const styles = StyleSheet.create({
   link: {
     color: colors.primary,
     fontWeight: '600',
+  },
+  linkDisabled: {
+    color: colors.placeholder,
   },
   stepIndicator: {
     alignSelf: 'flex-end',

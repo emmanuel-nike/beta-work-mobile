@@ -1,5 +1,11 @@
 import { API_BASE_URL } from '../config/env';
 
+let authToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  authToken = token;
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly body: unknown;
@@ -48,8 +54,9 @@ export async function apiRequest<T>(
     Accept: 'application/json',
   };
 
-  if (options.token) {
-    headers.Authorization = `Bearer ${options.token}`;
+  const token = options.token ?? authToken;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
   let body: string | FormData | undefined;

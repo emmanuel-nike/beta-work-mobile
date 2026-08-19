@@ -21,7 +21,15 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 [bundle exec] fastlane ios release
 ```
 
-Description of what the lane does
+Release the app to the App Store
+
+### ios deploy
+
+```sh
+[bundle exec] fastlane ios deploy
+```
+
+Upload an existing IPA to App Store Connect
 
 ----
 

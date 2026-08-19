@@ -45,9 +45,26 @@ platform :ios do
     # 5. Upload the built binary and submit for App Store review
     upload_to_app_store(
       api_key: api_key,
-      skip_metadata: false,          # Set to true if managing metadata on the web portal instead
-      skip_screenshots: false,       # Set to true if managing screenshots manually
+      skip_metadata: true,          # Set to true if managing metadata on the web portal instead
+      skip_screenshots: true,       # Set to true if managing screenshots manually
       submit_for_review: false       # Set to true to automatically click submit for review
     )
+  end
+
+  desc "Upload an existing IPA to App Store Connect" 
+  lane :deploy do 
+    api_key = app_store_connect_api_key( 
+      key_id: "B842TCUH7K", 
+      issuer_id: "dff63a2a-d197-4f33-b324-0961d113c4f5", 
+      key_filepath: "./fastlane/AuthKey_B842TCUH7K.p8" 
+    ) 
+    
+    upload_to_app_store( 
+      api_key: api_key, 
+      ipa: "./BetaWork.ipa", 
+      skip_metadata: true, 
+      skip_screenshots: true, 
+      submit_for_review: false 
+    ) 
   end
 end

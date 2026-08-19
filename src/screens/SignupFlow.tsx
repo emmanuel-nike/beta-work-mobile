@@ -33,14 +33,17 @@ import { ApiError } from '../api/client';
 import { splitFullName, toE164Phone } from '../api/phone';
 import { ActionButton } from '../components/ActionButton';
 import { FormField } from '../components/FormField';
+import { useOtpResendCountdown } from '../hooks/useOtpResendCountdown';
+import { usePreAuthNavigation } from '../navigation/types';
+import { useAppDispatch } from '../store/hooks';
+import {
+  sessionFromTokenResponse,
+  setSession,
+  type AuthSession,
+} from '../store/slices/authSlice';
 import { colors } from '../theme/colors';
 
 type SignupStep = 'details' | 'verification' | 'success';
-
-type SignupFlowProps = Readonly<{
-  onDashboard?: () => void;
-  onSignIn?: () => void;
-}>;
 
 type FormState = {
   fullName: string;
@@ -70,13 +73,13 @@ const isValidEmail = (value: string) => {
   );
 };
 
-export function SignupFlow({
-  onDashboard = () => {},
-  onSignIn = () => {},
-}: SignupFlowProps) {
+export function SignupFlow() {
+  const dispatch = useAppDispatch();
+  const navigation = usePreAuthNavigation();
   const [step, setStep] = useState<SignupStep>('details');
   const [form, setForm] = useState(INITIAL_FORM);
   const [otp, setOtp] = useState('');
+  const [pendingSession, setPendingSession] = useState<AuthSession | null>(null);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -90,7 +93,7 @@ export function SignupFlow({
             setStep('verification');
           }}
           onFormChange={setForm}
-          onSignIn={onSignIn}
+          onSignIn={() => navigation.navigate('SignIn')}
         />
       ) : null}
       {step === 'verification' ? (
@@ -99,10 +102,21 @@ export function SignupFlow({
           initialOtp={otp}
           onBack={() => setStep('details')}
           onOtpChange={setOtp}
-          onVerified={() => setStep('success')}
+          onVerified={nextSession => {
+            setPendingSession(nextSession);
+            setStep('success');
+          }}
         />
       ) : null}
-      {step === 'success' ? <SuccessScreen onDashboard={onDashboard} /> : null}
+      {step === 'success' ? (
+        <SuccessScreen
+          onDashboard={() => {
+            if (pendingSession) {
+              dispatch(setSession(pendingSession));
+            }
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -274,6 +288,8 @@ function SignupDetails({
   );
 }
 
+const OTP_EXPIRY_SECONDS = 600;
+
 function VerificationScreen({
   form,
   initialOtp,
@@ -285,7 +301,7 @@ function VerificationScreen({
   initialOtp: string;
   onBack: () => void;
   onOtpChange: (otp: string) => void;
-  onVerified: () => void;
+  onVerified: (session: AuthSession) => void;
 }>) {
   const [code, setCode] = useState(initialOtp.replace(/\D/g, '').slice(0, 6));
   const [hasError, setHasError] = useState(false);
@@ -293,6 +309,8 @@ function VerificationScreen({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const displayPhone = toE164Phone(form.phone);
+  const { canResend, formattedTime, resetCountdown } =
+    useOtpResendCountdown(OTP_EXPIRY_SECONDS);
 
   useEffect(() => {
     const nextCode = initialOtp.replace(/\D/g, '').slice(0, 6);
@@ -308,11 +326,16 @@ function VerificationScreen({
   };
 
   const resend = async () => {
+    if (!canResend || isSubmitting) {
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError('');
     try {
       const response = await sendOtp(form.phone);
       updateCode(response.otp);
+      resetCountdown();
     } catch (error) {
       setSubmitError(
         error instanceof ApiError
@@ -336,7 +359,7 @@ function VerificationScreen({
     try {
       await verifyOtp(form.phone, code);
       const { firstName, lastName } = splitFullName(form.fullName);
-      await registerUser({
+      const response = await registerUser({
         firstName,
         lastName,
         email: form.email.trim(),
@@ -345,7 +368,7 @@ function VerificationScreen({
         address: form.address.trim() || undefined,
         role: 'user',
       });
-      onVerified();
+      onVerified(sessionFromTokenResponse(response));
     } catch (error) {
       setHasError(true);
       setSubmitError(
@@ -418,8 +441,10 @@ function VerificationScreen({
       ) : null}
 
       <Text style={styles.expiry}>
-        This code will expire in 10:00{' '}
-        <Text onPress={resend} style={styles.link}>
+        This code will expire in {formattedTime}{' '}
+        <Text
+          onPress={canResend && !isSubmitting ? resend : undefined}
+          style={[styles.link, !canResend && styles.linkDisabled]}>
           Resend
         </Text>
       </Text>
@@ -564,6 +589,9 @@ const styles = StyleSheet.create({
   link: {
     color: colors.primary,
     fontWeight: '600',
+  },
+  linkDisabled: {
+    color: colors.placeholder,
   },
   signIn: {
     color: colors.textPrimary,

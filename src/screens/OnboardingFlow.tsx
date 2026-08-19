@@ -18,6 +18,7 @@ import RoleSelectionArtwork from '../../assets/images/role-selection.svg';
 import WelcomeArtwork from '../../assets/images/welcome.png';
 import { ActionButton } from '../components/ActionButton';
 import { ProgressBar } from '../components/ProgressBar';
+import { usePreAuthNavigation } from '../navigation/types';
 import { colors } from '../theme/colors';
 import { DEFAULT_ONBOARDING_SCREEN_DURATION_MS } from '../theme/onboarding';
 
@@ -51,16 +52,11 @@ const ONBOARDING_PAGES: OnboardingPage[] = [
 ];
 
 export function OnboardingFlow({
-  onCreateAccount,
-  onOfferService,
-  onLogin,
   screenDurationMs = DEFAULT_ONBOARDING_SCREEN_DURATION_MS,
 }: Readonly<{
-  onCreateAccount: () => void;
-  onOfferService: () => void;
-  onLogin: () => void;
   screenDurationMs?: number;
 }>) {
+  const navigation = usePreAuthNavigation();
   const [screen, setScreen] = useState<Screen>('splash');
   const [pageIndex, setPageIndex] = useState(0);
 
@@ -105,18 +101,18 @@ export function OnboardingFlow({
       {screen === 'welcome' ? (
         <WelcomeScreen
           onGetStarted={() => setScreen('role')}
-          onLogin={onLogin}
+          onLogin={() => navigation.navigate('SignIn')}
         />
       ) : null}
       {screen === 'role' ? (
         <RoleSelectionScreen
           onNeedService={() => openOnboarding(0)}
-          onOfferService={onOfferService}
+          onOfferService={() => navigation.navigate('ArtisanSignup')}
         />
       ) : null}
       {screen === 'onboarding' ? (
         <OnboardingScreen
-          onCreateAccount={onCreateAccount}
+          onCreateAccount={() => navigation.navigate('Signup')}
           onPageChange={setPageIndex}
           pageIndex={pageIndex}
           screenDurationMs={screenDurationMs}

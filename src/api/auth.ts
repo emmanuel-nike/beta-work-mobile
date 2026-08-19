@@ -97,6 +97,18 @@ export async function login(email: string, password: string) {
   });
 }
 
+export async function fetchCurrentUser() {
+  return apiRequest<{ user: AuthTokenResponse['user'] }>('/auth/me', {
+    method: 'GET',
+  });
+}
+
+export async function logout() {
+  return apiRequest<{ message?: string }>('/auth/logout', {
+    method: 'POST',
+  });
+}
+
 export function buildValidatePayloadFromForm(input: {
   fullName: string;
   email: string;

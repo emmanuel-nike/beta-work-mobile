@@ -38,6 +38,10 @@ import { toE164Phone } from '../api/phone';
 import { ActionButton } from '../components/ActionButton';
 import { FormField } from '../components/FormField';
 import { ProgressBar } from '../components/ProgressBar';
+import { useOtpResendCountdown } from '../hooks/useOtpResendCountdown';
+import { usePreAuthNavigation } from '../navigation/types';
+import { useAppDispatch } from '../store/hooks';
+import { createDemoSession, setSession } from '../store/slices/authSlice';
 import { colors } from '../theme/colors';
 import { DEFAULT_ONBOARDING_SCREEN_DURATION_MS } from '../theme/onboarding';
 
@@ -68,7 +72,14 @@ const SPLASH_PAGES: SplashPage[] = [
   },
 ];
 
-const OTP_POSITIONS = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth'] as const;
+const OTP_POSITIONS = [
+  'first',
+  'second',
+  'third',
+  'fourth',
+  'fifth',
+  'sixth',
+] as const;
 
 const ARTISAN_SKILLS = [
   'Plumber',
@@ -93,8 +104,6 @@ type SignupStep =
   | 'success';
 
 type ArtisanFlowProps = Readonly<{
-  onDashboard: () => void;
-  onSignIn: () => void;
   screenDurationMs?: number;
 }>;
 
@@ -116,10 +125,10 @@ const firstNameFrom = (fullName: string) => {
 };
 
 export function ArtisanFlow({
-  onDashboard,
-  onSignIn,
   screenDurationMs = DEFAULT_ONBOARDING_SCREEN_DURATION_MS,
 }: ArtisanFlowProps) {
+  const dispatch = useAppDispatch();
+  const navigation = usePreAuthNavigation();
   const [splashIndex, setSplashIndex] = useState(0);
   const [hasFinishedSplash, setHasFinishedSplash] = useState(false);
   const [step, setStep] = useState<SignupStep>('details');
@@ -167,7 +176,8 @@ export function ArtisanFlow({
           <Text style={styles.splashDescription}>{page.description}</Text>
           <ActionButton
             onPress={() => setHasFinishedSplash(true)}
-            style={styles.splashButton}>
+            style={styles.splashButton}
+          >
             Create account
           </ActionButton>
         </View>
@@ -177,10 +187,7 @@ export function ArtisanFlow({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar
-        backgroundColor={colors.background}
-        barStyle="dark-content"
-      />
+      <StatusBar backgroundColor={colors.background} barStyle="dark-content" />
       {step === 'details' ? (
         <ArtisanDetails
           onContinue={(phone, name, nextOtp) => {
@@ -189,7 +196,7 @@ export function ArtisanFlow({
             setOtp(nextOtp);
             setStep('verification');
           }}
-          onSignIn={onSignIn}
+          onSignIn={() => navigation.navigate('SignIn')}
         />
       ) : null}
       {step === 'verification' ? (
@@ -216,7 +223,16 @@ export function ArtisanFlow({
       {step === 'success' ? (
         <SuccessStep
           firstName={firstNameFrom(fullName)}
-          onDashboard={onDashboard}
+          onDashboard={() =>
+            dispatch(
+              setSession(
+                createDemoSession({
+                  firstName: firstNameFrom(fullName),
+                  role: 'artisan',
+                }),
+              ),
+            )
+          }
         />
       ) : null}
     </SafeAreaView>
@@ -279,10 +295,12 @@ function ArtisanDetails({
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.flex}>
+      style={styles.flex}
+    >
       <ScrollView
         contentContainerStyle={styles.formContent}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+      >
         <StepIndicator step={1} />
         <Heading
           title="Start your artisan journey"
@@ -346,7 +364,8 @@ function ArtisanDetails({
         <ActionButton
           disabled={isSubmitting}
           onPress={submit}
-          style={styles.submitButton}>
+          style={styles.submitButton}
+        >
           {isSubmitting ? 'Please wait...' : 'Continue'}
         </ActionButton>
         {isSubmitting ? (
@@ -368,6 +387,8 @@ function ArtisanDetails({
   );
 }
 
+const OTP_EXPIRY_SECONDS = 600;
+
 function VerificationStep({
   initialOtp,
   onBack,
@@ -387,6 +408,8 @@ function VerificationStep({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const displayPhone = toE164Phone(phoneNumber);
+  const { canResend, formattedTime, resetCountdown } =
+    useOtpResendCountdown(OTP_EXPIRY_SECONDS);
 
   useEffect(() => {
     setCode(initialOtp.replace(/\D/g, '').slice(0, 6));
@@ -401,11 +424,16 @@ function VerificationStep({
   };
 
   const resend = async () => {
+    if (!canResend || isSubmitting) {
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError('');
     try {
       const response = await sendOtp(phoneNumber);
       updateCode(response.otp);
+      resetCountdown();
     } catch (err) {
       setSubmitError(
         err instanceof ApiError
@@ -457,17 +485,17 @@ function VerificationStep({
       <Image source={OtpArtwork} style={styles.otpArtwork} />
       <Pressable
         onPress={() => inputRef.current?.focus()}
-        style={styles.otpArea}>
+        style={styles.otpArea}
+      >
         <View style={styles.otpRow}>
           {OTP_POSITIONS.map(position => {
             const positionIndex = OTP_POSITIONS.indexOf(position);
             return (
               <View
                 key={position}
-                style={[styles.otpBox, hasError && styles.otpBoxError]}>
-                <Text style={styles.otpDigit}>
-                  {code[positionIndex] ?? ''}
-                </Text>
+                style={[styles.otpBox, hasError && styles.otpBoxError]}
+              >
+                <Text style={styles.otpDigit}>{code[positionIndex] ?? ''}</Text>
               </View>
             );
           })}
@@ -488,21 +516,24 @@ function VerificationStep({
         immediately, please wait a few seconds or tap resend.
       </Text>
       <Text style={styles.expiry}>
-        This code will expire in 10:00{' '}
-        <Text onPress={resend} style={styles.link}>
+        This code will expire in {formattedTime}{' '}
+        <Text
+          onPress={canResend && !isSubmitting ? resend : undefined}
+          style={[styles.link, !canResend && styles.linkDisabled]}
+        >
           Resend
         </Text>
       </Text>
       {hasError || submitError ? (
         <Text style={styles.centerError}>
-          {submitError ||
-            'Verification code is incorrect. Please try again'}
+          {submitError || 'Verification code is incorrect. Please try again'}
         </Text>
       ) : null}
       <ActionButton
         disabled={code.length !== 6 || isSubmitting}
         onPress={verify}
-        style={styles.verifyButton}>
+        style={styles.verifyButton}
+      >
         {isSubmitting ? 'Verifying...' : 'Verify'}
       </ActionButton>
       <Text style={styles.bottomLink}>
@@ -535,10 +566,12 @@ function IdentityStep({
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.flex}>
+      style={styles.flex}
+    >
       <ScrollView
         contentContainerStyle={styles.formContent}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+      >
         <TopRow onBack={onBack} step={3} />
         <Heading
           title="Confirm your identity"
@@ -583,7 +616,8 @@ function IdentityStep({
           </View>
           <ActionButton
             onPress={() => setCaptured(true)}
-            style={captured ? styles.retakeButton : undefined}>
+            style={captured ? styles.retakeButton : undefined}
+          >
             {captured ? 'Retake Photo' : 'Capture face'}
           </ActionButton>
         </View>
@@ -631,10 +665,12 @@ function GuarantorStep({
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.flex}>
+      style={styles.flex}
+    >
       <ScrollView
         contentContainerStyle={styles.formContent}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+      >
         <TopRow onBack={onBack} step={4} />
         <Heading
           title="Add a guarantor"
@@ -723,10 +759,7 @@ function SuccessStep({
   );
 }
 
-function Heading({
-  title,
-  body,
-}: Readonly<{ title: string; body: string }>) {
+function Heading({ title, body }: Readonly<{ title: string; body: string }>) {
   return (
     <View style={styles.heading}>
       <Text style={styles.title}>{title}</Text>
@@ -752,12 +785,9 @@ function SkillSelect({
       <Pressable
         accessibilityRole="button"
         onPress={() => setOpen(true)}
-        style={styles.skillTrigger}>
-        <Text
-          style={[
-            styles.skillValue,
-            !value && styles.skillPlaceholder,
-          ]}>
+        style={styles.skillTrigger}
+      >
+        <Text style={[styles.skillValue, !value && styles.skillPlaceholder]}>
           {value || 'Select an option ...'}
         </Text>
         <Text style={styles.skillChevron}>▼</Text>
@@ -767,11 +797,13 @@ function SkillSelect({
         animationType="fade"
         transparent
         visible={open}
-        onRequestClose={() => setOpen(false)}>
+        onRequestClose={() => setOpen(false)}
+      >
         <Pressable
           accessibilityRole="button"
           onPress={() => setOpen(false)}
-          style={styles.skillOverlay}>
+          style={styles.skillOverlay}
+        >
           <Pressable onPress={() => {}} style={styles.skillSheet}>
             <Text style={styles.skillSheetTitle}>Select primary skill</Text>
             <ScrollView>
@@ -786,12 +818,14 @@ function SkillSelect({
                   style={[
                     styles.skillOption,
                     value === option && styles.skillOptionSelected,
-                  ]}>
+                  ]}
+                >
                   <Text
                     style={[
                       styles.skillOptionText,
                       value === option && styles.skillOptionTextSelected,
-                    ]}>
+                    ]}
+                  >
                     {option}
                   </Text>
                 </Pressable>
@@ -814,7 +848,8 @@ function TopRow({
         accessibilityLabel="Go back"
         accessibilityRole="button"
         onPress={onBack}
-        style={styles.backButton}>
+        style={styles.backButton}
+      >
         <BackIcon height={18} width={18} />
       </Pressable>
       <StepIndicator step={step} />
@@ -1016,6 +1051,9 @@ const styles = StyleSheet.create({
   link: {
     color: colors.primary,
     fontWeight: '700',
+  },
+  linkDisabled: {
+    color: colors.placeholder,
   },
   signIn: {
     color: colors.textSecondary,
