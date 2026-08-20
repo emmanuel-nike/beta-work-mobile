@@ -1,25 +1,32 @@
 import { NavigationContainer } from '@react-navigation/native';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
 
+import { SplashScreen } from '../screens/SplashScreen';
 import { useAppSelector } from '../store/hooks';
 import {
   selectIsAuthenticated,
   selectIsBootstrapping,
 } from '../store/slices/authSlice';
-import { colors } from '../theme/colors';
 import { AuthNavigator } from './AuthNavigator';
 import { PreAuthNavigator } from './PreAuthNavigator';
+
+const MIN_SPLASH_DURATION_MS = 1500;
 
 export function RootNavigator() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const isBootstrapping = useAppSelector(selectIsBootstrapping);
+  const [hasMinDurationElapsed, setHasMinDurationElapsed] = useState(false);
 
-  if (isBootstrapping) {
-    return (
-      <View style={styles.splash}>
-        <ActivityIndicator color={colors.primary} size="large" />
-      </View>
+  useEffect(() => {
+    const timer = setTimeout(
+      () => setHasMinDurationElapsed(true),
+      MIN_SPLASH_DURATION_MS,
     );
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isBootstrapping || !hasMinDurationElapsed) {
+    return <SplashScreen showLoader />;
   }
 
   return (
@@ -28,12 +35,3 @@ export function RootNavigator() {
     </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  splash: {
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    flex: 1,
-    justifyContent: 'center',
-  },
-});

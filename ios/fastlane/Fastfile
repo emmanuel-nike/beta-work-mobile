@@ -15,56 +15,87 @@
 
 default_platform(:ios)
 
+APP_STORE_CONNECT_KEY_ID = "B842TCUH7K"
+APP_STORE_CONNECT_ISSUER_ID = "dff63a2a-d197-4f33-b324-0961d113c4f5"
+APP_STORE_CONNECT_KEY_PATH = "./fastlane/AuthKey_B842TCUH7K.p8"
+
+XCODE_WORKSPACE = "BetaWork.xcworkspace"
+XCODE_SCHEME = "BetaWork"
+BUILD_OUTPUT_DIR = "./build"
+BUILD_OUTPUT_NAME = "BetaWork.ipa"
+
 platform :ios do
   desc "Release the app to the App Store"
   lane :release do
-    # 1. Authenticate with App Store Connect API
     api_key = app_store_connect_api_key(
-      key_id: "B842TCUH7K",
-      issuer_id: "dff63a2a-d197-4f33-b324-0961d113c4f5",
-      key_filepath: "./fastlane/AuthKey_B842TCUH7K.p8"
+      key_id: APP_STORE_CONNECT_KEY_ID,
+      issuer_id: APP_STORE_CONNECT_ISSUER_ID,
+      key_filepath: APP_STORE_CONNECT_KEY_PATH,
+      in_house: false
     )
 
-    # 2. Fetch or create signing certificates & profiles automatically
-    # Note: Requires setting up fastlane match or standard cert/sigh tools
-    cert
-    sigh(force: true)
+    # Provisioning – pass the API key so it never falls back to interactive login.
+    cert(api_key: api_key)
+    sigh(api_key: api_key, force: true)
 
-    # 3. Increment the build number to avoid Apple duplicate errors
+    # Handles the "no TestFlight builds yet" case gracefully.
+    latest_build = latest_testflight_build_number(
+      api_key: api_key,
+      initial_build_number: 0,
+      live: false
+    )
     increment_build_number(
-      build_number: latest_testflight_build_number(api_key: api_key) + 1
+      xcodeproj: "BetaWork.xcodeproj",
+      build_number: latest_build + 1
     )
 
-    # 4. Clean and build the iOS app binary (.ipa file)
     build_app(
-      scheme: "BetaWork",       # Your Xcode scheme name
-      workspace: "BetaWork.xcworkspace", # Or YourApp.xcodeproj if not using CocoaPods
-      export_method: "app-store"
+      workspace: XCODE_WORKSPACE,
+      scheme: XCODE_SCHEME,
+      configuration: "Release",
+      export_method: "app-store",
+      clean: true,
+      output_directory: BUILD_OUTPUT_DIR,
+      output_name: BUILD_OUTPUT_NAME,
+      include_bitcode: false,
+      include_symbols: true,
+      xcargs: "-allowProvisioningUpdates"
     )
 
-    # 5. Upload the built binary and submit for App Store review
     upload_to_app_store(
       api_key: api_key,
-      skip_metadata: true,          # Set to true if managing metadata on the web portal instead
-      skip_screenshots: true,       # Set to true if managing screenshots manually
-      submit_for_review: false       # Set to true to automatically click submit for review
+      ipa: "#{BUILD_OUTPUT_DIR}/#{BUILD_OUTPUT_NAME}",
+      platform: "ios",
+      skip_metadata: true,
+      skip_screenshots: true,
+      skip_app_version_update: true,
+      force: true,
+      run_precheck_before_submit: false,
+      precheck_include_in_app_purchases: false,
+      submit_for_review: false
     )
   end
 
-  desc "Upload an existing IPA to App Store Connect" 
-  lane :deploy do 
-    api_key = app_store_connect_api_key( 
-      key_id: "B842TCUH7K", 
-      issuer_id: "dff63a2a-d197-4f33-b324-0961d113c4f5", 
-      key_filepath: "./fastlane/AuthKey_B842TCUH7K.p8" 
-    ) 
-    
-    upload_to_app_store( 
-      api_key: api_key, 
-      ipa: "./BetaWork.ipa", 
-      skip_metadata: true, 
-      skip_screenshots: true, 
-      submit_for_review: false 
-    ) 
+  desc "Upload an existing IPA to App Store Connect"
+  lane :deploy do
+    api_key = app_store_connect_api_key(
+      key_id: APP_STORE_CONNECT_KEY_ID,
+      issuer_id: APP_STORE_CONNECT_ISSUER_ID,
+      key_filepath: APP_STORE_CONNECT_KEY_PATH,
+      in_house: false
+    )
+
+    upload_to_app_store(
+      api_key: api_key,
+      ipa: "./BetaWork.ipa",
+      platform: "ios",
+      skip_metadata: true,
+      skip_screenshots: true,
+      skip_app_version_update: true,
+      force: true,
+      run_precheck_before_submit: false,
+      precheck_include_in_app_purchases: false,
+      submit_for_review: false
+    )
   end
 end

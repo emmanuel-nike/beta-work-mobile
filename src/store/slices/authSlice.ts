@@ -227,3 +227,12 @@ export const selectAuthUser = (state: { auth: AuthState }) => state.auth.user;
 export const selectAuthStatus = (state: { auth: AuthState }) => state.auth.status;
 export const selectAuthError = (state: { auth: AuthState }) => state.auth.error;
 export const selectAuthToken = (state: { auth: AuthState }) => state.auth.token;
+export const selectAuthUserRole = (state: { auth: AuthState }) =>
+  state.auth.user?.role;
+export const selectIsArtisanVerified = (state: { auth: AuthState }) => {
+  const user = state.auth.user;
+  if (!user || user.role !== 'artisan') {
+    return false;
+  }
+  return user.isVerified ?? true;
+};

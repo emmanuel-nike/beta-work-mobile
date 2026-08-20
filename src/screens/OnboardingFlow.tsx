@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentType } from 'react';
+import { useMemo, useState, type ComponentType } from 'react';
 import {
   Image,
   PanResponder,
@@ -13,7 +13,6 @@ import type { SvgProps } from 'react-native-svg';
 import BookTermsArtwork from '../../assets/images/book-terms.svg';
 import FeedbackArtwork from '../../assets/images/feedback.svg';
 import HireArtisansArtwork from '../../assets/images/hire-artisans.svg';
-import BetaworkLogo from '../../assets/images/betawork-logo.svg';
 import RoleSelectionArtwork from '../../assets/images/role-selection.svg';
 import WelcomeArtwork from '../../assets/images/welcome.png';
 import { ActionButton } from '../components/ActionButton';
@@ -22,7 +21,7 @@ import { usePreAuthNavigation } from '../navigation/types';
 import { colors } from '../theme/colors';
 import { DEFAULT_ONBOARDING_SCREEN_DURATION_MS } from '../theme/onboarding';
 
-type Screen = 'splash' | 'welcome' | 'role' | 'onboarding';
+type Screen = 'welcome' | 'role' | 'onboarding';
 
 type OnboardingPage = {
   artwork: ComponentType<SvgProps>;
@@ -57,17 +56,8 @@ export function OnboardingFlow({
   screenDurationMs?: number;
 }>) {
   const navigation = usePreAuthNavigation();
-  const [screen, setScreen] = useState<Screen>('splash');
+  const [screen, setScreen] = useState<Screen>('welcome');
   const [pageIndex, setPageIndex] = useState(0);
-
-  useEffect(() => {
-    if (screen !== 'splash') {
-      return;
-    }
-
-    const timer = setTimeout(() => setScreen('welcome'), 1800);
-    return () => clearTimeout(timer);
-  }, [screen]);
 
   const panResponder = useMemo(
     () =>
@@ -97,7 +87,6 @@ export function OnboardingFlow({
         backgroundColor={colors.background}
         barStyle="dark-content"
       />
-      {screen === 'splash' ? <SplashScreen /> : null}
       {screen === 'welcome' ? (
         <WelcomeScreen
           onGetStarted={() => setScreen('role')}
@@ -119,17 +108,6 @@ export function OnboardingFlow({
         />
       ) : null}
     </SafeAreaView>
-  );
-}
-
-function SplashScreen() {
-  return (
-    <View style={[styles.screen, styles.splash]}>
-      <View style={styles.splashBrand}>
-        <BetaworkLogo height={45} width={220} />
-        <Text style={styles.splashTagline}>...Trustworthy connections</Text>
-      </View>
-    </View>
   );
 }
 
@@ -243,22 +221,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     flex: 1,
     paddingHorizontal: 24,
-  },
-  splash: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  splashBrand: {
-    alignItems: 'center',
-    gap: 8,
-    width: 263,
-  },
-  splashTagline: {
-    color: '#5C3D27',
-    fontSize: 16,
-    fontWeight: '600',
-    lineHeight: 24,
-    textAlign: 'center',
   },
   welcomeArtwork: {
     alignSelf: 'center',
