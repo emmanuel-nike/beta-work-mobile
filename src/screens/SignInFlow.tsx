@@ -1,6 +1,8 @@
+import { CommonActions } from '@react-navigation/native';
 import { useRef, useState } from 'react';
 import {
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -65,7 +67,19 @@ export function SignInFlow() {
       {step === 'login' ? (
         <LoginScreen
           onForgotPassword={() => setStep('resetEmail')}
-          onSignUp={() => navigation.navigate('Signup')}
+          onSignUp={() => {
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [
+                  {
+                    name: 'Onboarding',
+                    key: `Onboarding-${Date.now()}`,
+                  },
+                ],
+              }),
+            );
+          }}
         />
       ) : null}
       {step === 'resetEmail' ? (
@@ -177,12 +191,15 @@ function LoginScreen({
           </ActionButton>
         </View>
 
-        <Text style={styles.footer}>
-          Don’t have an account yet?{' '}
-          <Text onPress={onSignUp} style={styles.link}>
-            Sign up
-          </Text>
-        </Text>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Don’t have an account yet? </Text>
+          <Pressable
+            accessibilityRole="link"
+            hitSlop={8}
+            onPress={onSignUp}>
+            <Text style={styles.link}>Sign up</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -294,6 +311,7 @@ function ResetVerifyScreen({
   };
 
   const verify = () => {
+    Keyboard.dismiss();
     if (code === '123456') {
       onVerified();
       return;
@@ -302,112 +320,122 @@ function ResetVerifyScreen({
   };
 
   return (
-    <View style={styles.verifyScreen}>
-      <View style={styles.verifyTopRow}>
-        <Pressable
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-          onPress={onBack}
-          style={styles.backButton}>
-          <BackIcon height={18} width={18} />
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.flex}>
+      <ScrollView
+        contentContainerStyle={styles.verificationContent}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
+        <Pressable onPress={Keyboard.dismiss} style={styles.verificationInner}>
+          <View style={styles.verifyTopRow}>
+            <Pressable
+              accessibilityLabel="Go back"
+              accessibilityRole="button"
+              onPress={onBack}
+              style={styles.backButton}>
+              <BackIcon height={18} width={18} />
+            </Pressable>
+            <StepIndicator step={2} total={3} />
+          </View>
+
+          <View style={styles.heading}>
+            <Text style={styles.verifyTitle}>Verify your phone number</Text>
+            <Text style={styles.body}>
+              We have sent a 6-digit verification code by text.
+            </Text>
+          </View>
+
+          <View style={styles.phoneRow}>
+            <Text style={styles.phoneNumber}>{phoneNumber}</Text>
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => setPhoneNumber(phoneNumber)}
+              style={styles.editButton}>
+              <Text style={styles.editLabel}>Edit</Text>
+            </Pressable>
+          </View>
+
+          <Image
+            accessibilityIgnoresInvertColors
+            resizeMode="contain"
+            source={OtpArtwork}
+            style={styles.otpArtwork}
+          />
+
+          <Pressable
+            accessibilityLabel="Enter six-digit verification code"
+            onPress={() => inputRef.current?.focus()}
+            style={styles.otpArea}>
+            <View style={styles.otpRow}>
+              {Array.from({ length: 6 }).map((_, index) => {
+                const focused = code.length === index;
+                return (
+                  <View
+                    key={index}
+                    style={[
+                      styles.otpBox,
+                      focused && styles.otpBoxFocused,
+                      hasError && styles.otpBoxError,
+                    ]}>
+                    <Text style={styles.otpDigit}>{code[index] ?? ''}</Text>
+                  </View>
+                );
+              })}
+            </View>
+            <TextInput
+              ref={inputRef}
+              autoFocus
+              caretHidden
+              keyboardType="number-pad"
+              maxLength={6}
+              onChangeText={value => {
+                setCode(value.replace(/\D/g, ''));
+                setHasError(false);
+              }}
+              style={styles.hiddenOtpInput}
+              value={code}
+            />
+          </Pressable>
+
+          {hasError ? (
+            <Text style={styles.otpError}>
+              Verification code is incorrect. Please try again
+            </Text>
+          ) : (
+            <Text style={styles.otpHint}>
+              Enter the code sent to your phone number. If you don’t see it
+              immediately, please wait a few seconds or tap resend.
+            </Text>
+          )}
+
+          <Text style={styles.expiry}>
+            This code will expire in {formattedTime}{' '}
+            <Text
+              onPress={canResend && !isSubmitting ? resend : undefined}
+              style={[styles.link, !canResend && styles.linkDisabled]}>
+              Resend
+            </Text>
+          </Text>
+
+          <ActionButton
+            disabled={code.length !== 6}
+            onPress={verify}
+            style={styles.verifyButton}>
+            Verify
+          </ActionButton>
+
+          <Text style={styles.incorrectNumber}>
+            Incorrect phone number?{' '}
+            <Text onPress={onBack} style={styles.link}>
+              Go back
+            </Text>
+          </Text>
         </Pressable>
-        <StepIndicator step={2} total={3} />
-      </View>
-
-      <View style={styles.heading}>
-        <Text style={styles.verifyTitle}>Verify your phone number</Text>
-        <Text style={styles.body}>
-          We have sent a 6-digit verification code by text.
-        </Text>
-      </View>
-
-      <View style={styles.phoneRow}>
-        <Text style={styles.phoneNumber}>{phoneNumber}</Text>
-        <Pressable
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={() => setPhoneNumber(phoneNumber)}
-          style={styles.editButton}>
-          <Text style={styles.editLabel}>Edit</Text>
-        </Pressable>
-      </View>
-
-      <Image
-        accessibilityIgnoresInvertColors
-        resizeMode="contain"
-        source={OtpArtwork}
-        style={styles.otpArtwork}
-      />
-
-      <Pressable
-        accessibilityLabel="Enter six-digit verification code"
-        onPress={() => inputRef.current?.focus()}
-        style={styles.otpArea}>
-        <View style={styles.otpRow}>
-          {Array.from({ length: 6 }).map((_, index) => {
-            const focused = code.length === index;
-            return (
-              <View
-                key={index}
-                style={[
-                  styles.otpBox,
-                  focused && styles.otpBoxFocused,
-                  hasError && styles.otpBoxError,
-                ]}>
-                <Text style={styles.otpDigit}>{code[index] ?? ''}</Text>
-              </View>
-            );
-          })}
-        </View>
-        <TextInput
-          ref={inputRef}
-          autoFocus
-          caretHidden
-          keyboardType="number-pad"
-          maxLength={6}
-          onChangeText={value => {
-            setCode(value.replace(/\D/g, ''));
-            setHasError(false);
-          }}
-          style={styles.hiddenOtpInput}
-          value={code}
-        />
-      </Pressable>
-
-      {hasError ? (
-        <Text style={styles.otpError}>
-          Verification code is incorrect. Please try again
-        </Text>
-      ) : (
-        <Text style={styles.otpHint}>
-          Enter the code sent to your phone number. If you don’t see it
-          immediately, please wait a few seconds or tap resend.
-        </Text>
-      )}
-
-      <Text style={styles.expiry}>
-        This code will expire in {formattedTime}{' '}
-        <Text
-          onPress={canResend && !isSubmitting ? resend : undefined}
-          style={[styles.link, !canResend && styles.linkDisabled]}>
-          Resend
-        </Text>
-      </Text>
-
-      <ActionButton
-        disabled={code.length !== 6}
-        onPress={verify}
-        style={styles.verifyButton}>
-        Verify
-      </ActionButton>
-
-      <Text style={styles.incorrectNumber}>
-        Incorrect phone number?{' '}
-        <Text onPress={onBack} style={styles.link}>
-          Go back
-        </Text>
-      </Text>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -577,16 +605,23 @@ const styles = StyleSheet.create({
     marginTop: 48,
   },
   footer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: 'auto',
+    paddingTop: 48,
+  },
+  footerText: {
     color: colors.textPrimary,
     fontSize: 14,
     lineHeight: 21,
-    marginTop: 'auto',
-    paddingTop: 48,
-    textAlign: 'center',
   },
   link: {
     color: colors.primary,
+    fontSize: 14,
     fontWeight: '600',
+    lineHeight: 21,
   },
   linkDisabled: {
     color: colors.placeholder,
@@ -628,6 +663,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     flex: 1,
     paddingHorizontal: 24,
+  },
+  verificationContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
+    paddingHorizontal: 24,
+  },
+  verificationInner: {
+    flexGrow: 1,
   },
   verifyTopRow: {
     alignItems: 'flex-start',

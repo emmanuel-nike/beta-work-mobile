@@ -1,5 +1,8 @@
+import { memo, useState } from 'react';
 import {
+  FlatList,
   Image,
+  type ListRenderItemInfo,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,17 +17,21 @@ import {
   SearchBar,
   SectionHeader,
 } from '../components/dashboard/DashboardShell';
+import { ChangeLocationModal } from '../components/dashboard/ChangeLocationModal';
+import { DashboardBookingsSection } from '../components/dashboard/DashboardBookingsSection';
+import { ARTISAN_SERVICES } from '../data/artisanServices';
+import { BOOKINGS, type Booking } from '../data/bookings';
+import { DEFAULT_LOCATION_LABEL, type SavedAddress } from '../data/locations';
+import {
+  useAuthNavigation,
+  useClientTabNavigation,
+} from '../navigation/types';
 import { useAppSelector } from '../store/hooks';
 import { selectAuthUser } from '../store/slices/authSlice';
 import { dashboardColors } from '../theme/dashboard';
 
-const CATEGORY_ITEMS = [
-  { id: 'plumbing', label: 'Plumbing', emoji: '🔧' },
-  { id: 'cleaning', label: 'Cleaning', emoji: '🧹' },
-  { id: 'hair', label: 'Hair', emoji: '💇🏽‍♀️' },
-  { id: 'electrical', label: 'Electrical', emoji: '⚡️' },
-  { id: 'painting', label: 'Painting', emoji: '🎨' },
-] as const;
+/** The dashboard previews only the most recent bookings. */
+const DASHBOARD_BOOKING_LIMIT = 10;
 
 const POPULAR_ARTISANS = [
   {
@@ -73,6 +80,20 @@ const RECENT_ARTISANS = [
 export function UserDashboardScreen() {
   const user = useAppSelector(selectAuthUser);
   const firstName = user?.firstName?.trim() || 'there';
+  const authNavigation = useAuthNavigation();
+  const tabNavigation = useClientTabNavigation();
+  const dashboardBookings = BOOKINGS.slice(0, DASHBOARD_BOOKING_LIMIT);
+  const [isLocationPickerOpen, setLocationPickerOpen] = useState(false);
+  const [location, setLocation] = useState(DEFAULT_LOCATION_LABEL);
+
+  const handleSelectLocation = (address: SavedAddress) => {
+    setLocation(address.label);
+    setLocationPickerOpen(false);
+  };
+
+  const openBookings = () => tabNavigation.navigate('bookings');
+  const openBooking = (booking: Booking) =>
+    authNavigation.navigate('BookingDetails', { bookingId: booking.id });
 
   return (
     <DashboardShell
@@ -81,27 +102,47 @@ export function UserDashboardScreen() {
         <DashboardHeader
           firstName={firstName}
           footer={<SearchBar />}
+          location={location}
+          onLocationPress={() => setLocationPickerOpen(true)}
           subtitle="What do you need help with today?"
         />
       }
+      showTabBar={false}
     >
-      <View style={styles.section}>
-        <ScrollView
-          contentContainerStyle={styles.categoryRow}
+      <View style={styles.servicesSection}>
+        <View style={styles.servicesHeader}>
+          <Text style={styles.servicesTitle}>Browse services</Text>
+          <Pressable accessibilityRole="button" style={styles.viewAllButton}>
+            <Text style={styles.viewAllLabel}>View all</Text>
+          </Pressable>
+        </View>
+        <FlatList
+          contentContainerStyle={styles.servicesRow}
+          data={ARTISAN_SERVICES}
+          getItemLayout={(_, index) => ({
+            index,
+            length: 88,
+            offset: 88 * index,
+          })}
           horizontal
+          initialNumToRender={5}
+          keyExtractor={service => service.id}
+          maxToRenderPerBatch={3}
           nestedScrollEnabled
+          removeClippedSubviews
+          renderItem={renderService}
           showsHorizontalScrollIndicator={false}
-        >
-          {CATEGORY_ITEMS.map((category, index) => (
-            <CategoryChip
-              key={category.id}
-              emoji={category.emoji}
-              label={category.label}
-              selected={index === 0}
-            />
-          ))}
-        </ScrollView>
+          style={styles.servicesScroll}
+          windowSize={3}
+        />
       </View>
+
+      <DashboardBookingsSection
+        bookings={dashboardBookings}
+        onBookService={openBookings}
+        onSeeAll={openBookings}
+        onSelectBooking={openBooking}
+      />
 
       <View style={styles.section}>
         <SectionHeader actionLabel="See all" title="Popular near you" />
@@ -163,30 +204,37 @@ export function UserDashboardScreen() {
           />
         </ScrollView>
       </View>
+
+      <ChangeLocationModal
+        onClose={() => setLocationPickerOpen(false)}
+        onSelect={handleSelectLocation}
+        visible={isLocationPickerOpen}
+      />
     </DashboardShell>
   );
 }
 
-function CategoryChip({
-  emoji,
+type ArtisanService = (typeof ARTISAN_SERVICES)[number];
+
+function renderService({ item }: ListRenderItemInfo<ArtisanService>) {
+  return <ServiceTile {...item} />;
+}
+
+const ServiceTile = memo(function ServiceTile({
+  Artwork,
   label,
-  selected,
-}: Readonly<{ emoji: string; label: string; selected?: boolean }>) {
+}: Readonly<ArtisanService>) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      style={[styles.categoryChip, selected && styles.categoryChipSelected]}
-    >
-      <Text style={styles.categoryEmoji}>{emoji}</Text>
-      <Text
-        style={[styles.categoryLabel, selected && styles.categoryLabelSelected]}
-      >
+    <Pressable accessibilityRole="button" style={styles.serviceTile}>
+      <View style={styles.serviceArtwork}>
+        <Artwork height="100%" width="100%" />
+      </View>
+      <Text numberOfLines={2} style={styles.serviceLabel}>
         {label}
       </Text>
     </Pressable>
   );
-}
+});
 
 function ArtisanCard({
   image,
@@ -241,35 +289,57 @@ const styles = StyleSheet.create({
   content: {
     paddingTop: 16,
   },
-  categoryRow: {
-    gap: 12,
+  servicesSection: {
+    gap: 16,
+  },
+  servicesHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  servicesTitle: {
+    color: dashboardColors.textPrimary,
+    fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 24,
+  },
+  viewAllButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 103, 67, 0.09)',
+    borderRadius: 16,
+    height: 32,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  viewAllLabel: {
+    color: dashboardColors.tabBar,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  servicesRow: {
+    gap: 8,
     paddingRight: 24,
   },
-  categoryChip: {
-    alignItems: 'center',
+  servicesScroll: {
+    marginRight: -24,
+  },
+  serviceTile: {
+    gap: 6,
+    width: 80,
+  },
+  serviceArtwork: {
     backgroundColor: dashboardColors.category,
     borderRadius: 10,
     height: 79,
-    justifyContent: 'center',
-    paddingHorizontal: 10,
+    overflow: 'hidden',
     width: 80,
   },
-  categoryChipSelected: {
-    backgroundColor: dashboardColors.white,
-  },
-  categoryEmoji: {
-    fontSize: 22,
-    marginBottom: 6,
-  },
-  categoryLabel: {
-    color: dashboardColors.textSecondary,
-    fontSize: 12,
-    fontWeight: '500',
-    lineHeight: 16,
-    textAlign: 'center',
-  },
-  categoryLabelSelected: {
+  serviceLabel: {
     color: dashboardColors.textPrimary,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
   },
   section: {
     gap: 16,

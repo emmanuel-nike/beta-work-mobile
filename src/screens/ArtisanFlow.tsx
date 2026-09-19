@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   PanResponder,
@@ -350,7 +351,6 @@ function ArtisanDetails({
           />
           <FormField
             autoCapitalize="none"
-            autoComplete="new-password"
             helper="Your password keeps your account safe. Use at least 8 characters (letters or numbers)."
             icon={PasswordIcon}
             isPassword
@@ -450,6 +450,7 @@ function VerificationStep({
       return;
     }
 
+    Keyboard.dismiss();
     setIsSubmitting(true);
     setHasError(false);
     setSubmitError('');
@@ -470,79 +471,92 @@ function VerificationStep({
   };
 
   return (
-    <View style={styles.stepScreen}>
-      <TopRow onBack={onBack} step={2} />
-      <Heading
-        title="Verify your phone number"
-        body="We have sent a 6-digit verification code by text."
-      />
-      <View style={styles.phoneRow}>
-        <Text style={styles.phoneNumber}>{displayPhone}</Text>
-        <Pressable accessibilityRole="button" onPress={onBack}>
-          <Text style={styles.link}>Edit</Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.flex}>
+      <ScrollView
+        contentContainerStyle={styles.verificationContent}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
+        <Pressable onPress={Keyboard.dismiss} style={styles.verificationInner}>
+          <TopRow onBack={onBack} step={2} />
+          <Heading
+            title="Verify your phone number"
+            body="We have sent a 6-digit verification code by text."
+          />
+          <View style={styles.phoneRow}>
+            <Text style={styles.phoneNumber}>{displayPhone}</Text>
+            <Pressable accessibilityRole="button" onPress={onBack}>
+              <Text style={styles.link}>Edit</Text>
+            </Pressable>
+          </View>
+          <Image source={OtpArtwork} style={styles.otpArtwork} />
+          <Pressable
+            onPress={() => inputRef.current?.focus()}
+            style={styles.otpArea}
+          >
+            <View style={styles.otpRow}>
+              {OTP_POSITIONS.map(position => {
+                const positionIndex = OTP_POSITIONS.indexOf(position);
+                return (
+                  <View
+                    key={position}
+                    style={[styles.otpBox, hasError && styles.otpBoxError]}
+                  >
+                    <Text style={styles.otpDigit}>
+                      {code[positionIndex] ?? ''}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+            <TextInput
+              ref={inputRef}
+              autoFocus
+              caretHidden
+              keyboardType="number-pad"
+              maxLength={6}
+              onChangeText={updateCode}
+              style={styles.hiddenInput}
+              value={code}
+            />
+          </Pressable>
+          <Text style={styles.otpHint}>
+            Enter the code sent to your phone number. If you don’t see it
+            immediately, please wait a few seconds or tap resend.
+          </Text>
+          <Text style={styles.expiry}>
+            This code will expire in {formattedTime}{' '}
+            <Text
+              onPress={canResend && !isSubmitting ? resend : undefined}
+              style={[styles.link, !canResend && styles.linkDisabled]}
+            >
+              Resend
+            </Text>
+          </Text>
+          {hasError || submitError ? (
+            <Text style={styles.centerError}>
+              {submitError ||
+                'Verification code is incorrect. Please try again'}
+            </Text>
+          ) : null}
+          <ActionButton
+            disabled={code.length !== 6 || isSubmitting}
+            onPress={verify}
+            style={styles.verifyButton}
+          >
+            {isSubmitting ? 'Verifying...' : 'Verify'}
+          </ActionButton>
+          <Text style={styles.bottomLink}>
+            Incorrect phone number?{' '}
+            <Text onPress={onBack} style={styles.link}>
+              Go back
+            </Text>
+          </Text>
         </Pressable>
-      </View>
-      <Image source={OtpArtwork} style={styles.otpArtwork} />
-      <Pressable
-        onPress={() => inputRef.current?.focus()}
-        style={styles.otpArea}
-      >
-        <View style={styles.otpRow}>
-          {OTP_POSITIONS.map(position => {
-            const positionIndex = OTP_POSITIONS.indexOf(position);
-            return (
-              <View
-                key={position}
-                style={[styles.otpBox, hasError && styles.otpBoxError]}
-              >
-                <Text style={styles.otpDigit}>{code[positionIndex] ?? ''}</Text>
-              </View>
-            );
-          })}
-        </View>
-        <TextInput
-          ref={inputRef}
-          autoFocus
-          caretHidden
-          keyboardType="number-pad"
-          maxLength={6}
-          onChangeText={updateCode}
-          style={styles.hiddenInput}
-          value={code}
-        />
-      </Pressable>
-      <Text style={styles.otpHint}>
-        Enter the code sent to your phone number. If you don’t see it
-        immediately, please wait a few seconds or tap resend.
-      </Text>
-      <Text style={styles.expiry}>
-        This code will expire in {formattedTime}{' '}
-        <Text
-          onPress={canResend && !isSubmitting ? resend : undefined}
-          style={[styles.link, !canResend && styles.linkDisabled]}
-        >
-          Resend
-        </Text>
-      </Text>
-      {hasError || submitError ? (
-        <Text style={styles.centerError}>
-          {submitError || 'Verification code is incorrect. Please try again'}
-        </Text>
-      ) : null}
-      <ActionButton
-        disabled={code.length !== 6 || isSubmitting}
-        onPress={verify}
-        style={styles.verifyButton}
-      >
-        {isSubmitting ? 'Verifying...' : 'Verify'}
-      </ActionButton>
-      <Text style={styles.bottomLink}>
-        Incorrect phone number?{' '}
-        <Text onPress={onBack} style={styles.link}>
-          Go back
-        </Text>
-      </Text>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1065,6 +1079,15 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 22,
     paddingTop: 26,
+  },
+  verificationContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
+    paddingHorizontal: 22,
+    paddingTop: 26,
+  },
+  verificationInner: {
+    flexGrow: 1,
   },
   topRow: {
     alignItems: 'flex-start',

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -128,7 +129,7 @@ function SignupDetails({
   onSignIn,
 }: Readonly<{
   form: FormState;
-  onFormChange: (form: FormState) => void;
+  onFormChange: (form: FormState | ((prev: FormState) => FormState)) => void;
   onContinue: (form: FormState, otp: string) => void;
   onSignIn: () => void;
 }>) {
@@ -137,7 +138,7 @@ function SignupDetails({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateField = (field: keyof FormState, value: string) => {
-    onFormChange({ ...form, [field]: value });
+    onFormChange(prev => ({ ...prev, [field]: value }));
     setErrors(current => ({ ...current, [field]: undefined }));
     setSubmitError('');
   };
@@ -248,7 +249,6 @@ function SignupDetails({
           />
           <FormField
             autoCapitalize="none"
-            autoComplete="new-password"
             error={errors.password}
             helper="Your password keeps your account safe. Use at least 8 characters (letters or numbers)."
             icon={PasswordIcon}
@@ -256,7 +256,6 @@ function SignupDetails({
             label="Password"
             onChangeText={value => updateField('password', value)}
             placeholder="Type your password here"
-            textContentType="newPassword"
             value={form.password}
           />
         </View>
@@ -352,6 +351,7 @@ function VerificationScreen({
       return;
     }
 
+    Keyboard.dismiss();
     setIsSubmitting(true);
     setSubmitError('');
     setHasError(false);
@@ -382,87 +382,97 @@ function VerificationScreen({
   };
 
   return (
-    <View style={styles.verificationScreen}>
-      <View style={styles.verificationTopRow}>
-        <Pressable
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-          onPress={onBack}
-          style={styles.backButton}>
-          <BackIcon height={18} width={18} />
-        </Pressable>
-        <StepIndicator step={2} />
-      </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.flex}>
+      <ScrollView
+        contentContainerStyle={styles.verificationContent}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
+        <Pressable onPress={Keyboard.dismiss} style={styles.verificationInner}>
+          <View style={styles.verificationTopRow}>
+            <Pressable
+              accessibilityLabel="Go back"
+              accessibilityRole="button"
+              onPress={onBack}
+              style={styles.backButton}>
+              <BackIcon height={18} width={18} />
+            </Pressable>
+            <StepIndicator step={2} />
+          </View>
 
-      <View style={styles.verificationHeading}>
-        <Text style={styles.verificationTitle}>Verify your phone number</Text>
-        <Text style={styles.body}>
-          Enter the code sent to{' '}
-          <Text style={styles.phoneEmphasis}>{displayPhone}</Text>
-        </Text>
-      </View>
+          <View style={styles.verificationHeading}>
+            <Text style={styles.verificationTitle}>Verify your phone number</Text>
+            <Text style={styles.body}>
+              Enter the code sent to{' '}
+              <Text style={styles.phoneEmphasis}>{displayPhone}</Text>
+            </Text>
+          </View>
 
-      <Image
-        accessibilityIgnoresInvertColors
-        resizeMode="contain"
-        source={OtpArtwork}
-        style={styles.otpArtwork}
-      />
+          <Image
+            accessibilityIgnoresInvertColors
+            resizeMode="contain"
+            source={OtpArtwork}
+            style={styles.otpArtwork}
+          />
 
-      <Pressable
-        accessibilityLabel="Enter six-digit verification code"
-        onPress={() => inputRef.current?.focus()}
-        style={styles.otpArea}>
-        <View style={styles.otpRow}>
-          {Array.from({ length: 6 }).map((_, index) => (
-            <View
-              key={`otp-${index}`}
-              style={[styles.otpBox, hasError && styles.otpBoxError]}>
-              <Text style={styles.otpDigit}>{code[index] ?? ''}</Text>
+          <Pressable
+            accessibilityLabel="Enter six-digit verification code"
+            onPress={() => inputRef.current?.focus()}
+            style={styles.otpArea}>
+            <View style={styles.otpRow}>
+              {Array.from({ length: 6 }).map((_, index) => (
+                <View
+                  key={`otp-${index}`}
+                  style={[styles.otpBox, hasError && styles.otpBoxError]}>
+                  <Text style={styles.otpDigit}>{code[index] ?? ''}</Text>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
-        <TextInput
-          ref={inputRef}
-          autoFocus
-          caretHidden
-          keyboardType="number-pad"
-          maxLength={6}
-          onChangeText={updateCode}
-          style={styles.hiddenOtpInput}
-          value={code}
-        />
-      </Pressable>
+            <TextInput
+              ref={inputRef}
+              autoFocus
+              caretHidden
+              keyboardType="number-pad"
+              maxLength={6}
+              onChangeText={updateCode}
+              style={styles.hiddenOtpInput}
+              value={code}
+            />
+          </Pressable>
 
-      {hasError || submitError ? (
-        <Text style={styles.otpError}>
-          {submitError || 'Verification code is incorrect. Please try again'}
-        </Text>
-      ) : null}
+          {hasError || submitError ? (
+            <Text style={styles.otpError}>
+              {submitError || 'Verification code is incorrect. Please try again'}
+            </Text>
+          ) : null}
 
-      <Text style={styles.expiry}>
-        This code will expire in {formattedTime}{' '}
-        <Text
-          onPress={canResend && !isSubmitting ? resend : undefined}
-          style={[styles.link, !canResend && styles.linkDisabled]}>
-          Resend
-        </Text>
-      </Text>
+          <Text style={styles.expiry}>
+            This code will expire in {formattedTime}{' '}
+            <Text
+              onPress={canResend && !isSubmitting ? resend : undefined}
+              style={[styles.link, !canResend && styles.linkDisabled]}>
+              Resend
+            </Text>
+          </Text>
 
-      <ActionButton
-        disabled={code.length !== 6 || isSubmitting}
-        onPress={verify}
-        style={styles.verifyButton}>
-        {isSubmitting ? 'Verifying...' : 'Verify'}
-      </ActionButton>
+          <ActionButton
+            disabled={code.length !== 6 || isSubmitting}
+            onPress={verify}
+            style={styles.verifyButton}>
+            {isSubmitting ? 'Verifying...' : 'Verify'}
+          </ActionButton>
 
-      <Text style={styles.incorrectNumber}>
-        Incorrect phone number?{' '}
-        <Text onPress={onBack} style={styles.link}>
-          Go back
-        </Text>
-      </Text>
-    </View>
+          <Text style={styles.incorrectNumber}>
+            Incorrect phone number?{' '}
+            <Text onPress={onBack} style={styles.link}>
+              Go back
+            </Text>
+          </Text>
+        </Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -604,6 +614,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     flex: 1,
     paddingHorizontal: 24,
+  },
+  verificationContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
+    paddingHorizontal: 24,
+  },
+  verificationInner: {
+    flexGrow: 1,
   },
   verificationTopRow: {
     alignItems: 'flex-start',

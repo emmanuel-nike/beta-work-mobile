@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 
+import { ClientTabNavigator } from '../navigation/ClientTabNavigator';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   refreshCurrentUser,
@@ -8,7 +9,6 @@ import {
   selectIsArtisanVerified,
 } from '../store/slices/authSlice';
 import { ArtisanDashboardScreen } from './ArtisanDashboardScreen';
-import { UserDashboardScreen } from './UserDashboardScreen';
 
 export function DashboardScreen() {
   const dispatch = useAppDispatch();
@@ -33,5 +33,5 @@ export function DashboardScreen() {
     return <ArtisanDashboardScreen isVerified={isArtisanVerified} />;
   }
 
-  return <UserDashboardScreen />;
+  return <ClientTabNavigator />;
 }

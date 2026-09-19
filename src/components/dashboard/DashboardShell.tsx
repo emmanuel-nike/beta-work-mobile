@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DashboardHeaderPattern from '../../../assets/images/dashboard_header_pattern.svg';
 import {
   BellIcon,
+  BookingsIcon,
   ChevronDownIcon,
   HomeIcon,
   JobsIcon,
@@ -24,9 +25,16 @@ import {
   SearchIcon,
   type IconColorProps,
 } from '../icons';
+import { useAppSelector } from '../../store/hooks';
+import { selectAuthUserRole } from '../../store/slices/authSlice';
 import { dashboardColors, getTimeGreeting } from '../../theme/dashboard';
 
-export type DashboardTab = 'home' | 'jobs' | 'messages' | 'profile';
+export type DashboardTab =
+  | 'home'
+  | 'bookings'
+  | 'jobs'
+  | 'messages'
+  | 'profile';
 
 type DashboardShellProps = Readonly<{
   backgroundColor?: string;
@@ -35,6 +43,7 @@ type DashboardShellProps = Readonly<{
   scrollHeader?: ReactNode;
   activeTab?: DashboardTab;
   tabsDisabled?: boolean;
+  showTabBar?: boolean;
   onTabPress?: (tab: DashboardTab) => void;
   contentStyle?: StyleProp<ViewStyle>;
 }>;
@@ -46,6 +55,7 @@ export function DashboardShell({
   scrollHeader,
   activeTab = 'home',
   tabsDisabled = false,
+  showTabBar = true,
   onTabPress,
   contentStyle,
 }: DashboardShellProps) {
@@ -85,12 +95,14 @@ export function DashboardShell({
           </ScrollView>
         </>
       )}
-      <DashboardTabBar
-        activeTab={activeTab}
-        bottomInset={insets.bottom}
-        disabled={tabsDisabled}
-        onTabPress={onTabPress}
-      />
+      {showTabBar ? (
+        <DashboardTabBar
+          activeTab={activeTab}
+          bottomInset={insets.bottom}
+          disabled={tabsDisabled}
+          onTabPress={onTabPress}
+        />
+      ) : null}
     </View>
   );
 }
@@ -121,6 +133,7 @@ type DashboardHeaderProps = Readonly<{
   subtitle?: string;
   height?: number;
   footer?: ReactNode;
+  onLocationPress?: () => void;
 }>;
 
 export function DashboardHeader({
@@ -129,6 +142,7 @@ export function DashboardHeader({
   subtitle,
   height = 220,
   footer,
+  onLocationPress,
 }: DashboardHeaderProps) {
   const insets = useSafeAreaInsets();
   const greeting = getTimeGreeting();
@@ -144,7 +158,17 @@ export function DashboardHeader({
         ]}
       >
         <View style={styles.headerTopRow}>
-          <Pressable accessibilityRole="button" style={styles.locationButton}>
+          <Pressable
+            accessibilityHint="Opens the location picker"
+            accessibilityLabel={`Current location: ${location}. Change location`}
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={onLocationPress}
+            style={({ pressed }) => [
+              styles.locationButton,
+              pressed && onLocationPress != null && styles.locationPressed,
+            ]}
+          >
             <LocationIcon />
             <Text style={styles.locationText}>{location}</Text>
             <ChevronDownIcon />
@@ -186,20 +210,32 @@ const TAB_ITEMS: ReadonlyArray<{
   Icon: ComponentType<IconColorProps>;
 }> = [
   { id: 'home', label: 'Home', Icon: HomeIcon },
+  { id: 'bookings', label: 'Bookings', Icon: BookingsIcon },
   { id: 'jobs', label: 'Jobs', Icon: JobsIcon },
   { id: 'messages', label: 'Messages', Icon: MessagesIcon },
   { id: 'profile', label: 'Profile', Icon: ProfileIcon },
 ];
 
-function DashboardTabBar({
+export function DashboardTabBar({
   activeTab,
   bottomInset,
   disabled = false,
   onTabPress,
 }: DashboardTabBarProps) {
+  const role = useAppSelector(selectAuthUserRole);
+  const visibleTabs = TAB_ITEMS.filter(item => {
+    if (item.id === 'bookings') {
+      return role !== 'artisan';
+    }
+    if (item.id === 'jobs') {
+      return role === 'artisan';
+    }
+    return true;
+  });
+
   return (
     <View style={[styles.tabBar, { paddingBottom: Math.max(bottomInset, 8) }]}>
-      {TAB_ITEMS.map(({ id, label, Icon }) => {
+      {visibleTabs.map(({ id, label, Icon }) => {
         const isActive = activeTab === id;
         const color =
           disabled && !isActive
@@ -330,6 +366,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 6,
+  },
+  locationPressed: {
+    opacity: 0.7,
   },
   locationText: {
     color: dashboardColors.textOnDark,

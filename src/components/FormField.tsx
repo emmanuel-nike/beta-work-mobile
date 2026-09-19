@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -35,9 +35,25 @@ export function FormField({
   error,
   helper,
   isPassword = false,
+  autoCapitalize,
+  autoComplete,
+  textContentType,
+  value = '',
+  onChangeText,
   ...inputProps
 }: FormFieldProps) {
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [draftValue, setDraftValue] = useState(value);
+  const secureTextEntry = isPassword && !passwordVisible;
+
+  useEffect(() => {
+    setDraftValue(value);
+  }, [value]);
+
+  const handleChangeText = (nextValue: string) => {
+    setDraftValue(nextValue);
+    onChangeText?.(nextValue);
+  };
 
   return (
     <View style={styles.field}>
@@ -45,10 +61,19 @@ export function FormField({
       <View style={[styles.inputFrame, error && styles.inputError]}>
         <Icon height={20} width={20} />
         <TextInput
-          placeholderTextColor={colors.placeholder}
-          secureTextEntry={isPassword && !passwordVisible}
-          style={styles.input}
           {...inputProps}
+          autoCapitalize={autoCapitalize ?? (isPassword ? 'none' : 'sentences')}
+          autoComplete={isPassword ? 'off' : autoComplete}
+          autoCorrect={!isPassword}
+          importantForAutofill={isPassword ? 'no' : 'auto'}
+          onChangeText={handleChangeText}
+          placeholderTextColor={colors.placeholder}
+          secureTextEntry={secureTextEntry}
+          spellCheck={!isPassword}
+          style={styles.input}
+          textContentType={isPassword ? 'none' : textContentType}
+          underlineColorAndroid="transparent"
+          value={draftValue}
         />
         {isPassword ? (
           <Pressable
@@ -57,8 +82,12 @@ export function FormField({
             }
             accessibilityRole="button"
             hitSlop={10}
-            onPress={() => setPasswordVisible(current => !current)}>
-            <EyeSlashIcon height={18} width={18} />
+            onPress={() => setPasswordVisible(current => !current)}
+            style={styles.visibilityToggle}
+          >
+            <View style={passwordVisible ? styles.eyeVisible : undefined}>
+              <EyeSlashIcon height={18} width={18} />
+            </View>
           </Pressable>
         ) : null}
       </View>
@@ -84,7 +113,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: 8,
-    height: 50,
+    minHeight: 50,
     paddingHorizontal: 16,
   },
   inputError: {
@@ -94,8 +123,16 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     flex: 1,
     fontSize: 14,
-    height: 50,
+    lineHeight: 20,
     padding: 0,
+  },
+  visibilityToggle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 2,
+  },
+  eyeVisible: {
+    opacity: 0.45,
   },
   helper: {
     color: colors.helperText,
