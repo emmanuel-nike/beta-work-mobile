@@ -13,12 +13,23 @@ export type BookingsStackParamList = {
   BookingsList: undefined
 }
 
+export type HomeStackParamList = {
+  Dashboard: undefined
+}
+
 export type MessagesStackParamList = {
   MessagesList: undefined
 }
 
-export type ClientTabParamList = {
+export type ArtisanTabParamList = {
   home: undefined
+  jobs: undefined
+  messages: NavigatorScreenParams<MessagesStackParamList> | undefined
+  profile: undefined
+}
+
+export type ClientTabParamList = {
+  home: NavigatorScreenParams<HomeStackParamList> | undefined
   bookings: NavigatorScreenParams<BookingsStackParamList> | undefined
   messages: NavigatorScreenParams<MessagesStackParamList> | undefined
   profile: undefined
@@ -30,6 +41,10 @@ export type AuthStackParamList = {
   BookingDetails: { bookingId: string }
   RaiseDispute: { bookingId: string }
   LeaveFeedback: { bookingId: string }
+  AllArtisans: { title?: string; query?: string } | undefined
+  ArtisanProfile: { artisanId: string }
+  EditProfile: undefined
+  ChangePassword: undefined
 }
 
 export type PreAuthNavigation = NativeStackNavigationProp<PreAuthStackParamList>
@@ -37,6 +52,7 @@ export type AuthNavigation = NativeStackNavigationProp<AuthStackParamList>
 export type ClientTabNavigation = BottomTabNavigationProp<ClientTabParamList>
 export type BookingsNavigation = NativeStackNavigationProp<BookingsStackParamList>
 export type MessagesNavigation = NativeStackNavigationProp<MessagesStackParamList>
+export type HomeNavigation = NativeStackNavigationProp<HomeStackParamList>
 
 export type BookingsStackScreenProps<T extends keyof BookingsStackParamList> =
   NativeStackScreenProps<BookingsStackParamList, T>
@@ -46,6 +62,9 @@ export type AuthStackScreenProps<T extends keyof AuthStackParamList> =
 
 export type MessagesStackScreenProps<T extends keyof MessagesStackParamList> =
   NativeStackScreenProps<MessagesStackParamList, T>
+
+export type HomeStackScreenProps<T extends keyof HomeStackParamList> =
+  NativeStackScreenProps<HomeStackParamList, T>
 
 export function usePreAuthNavigation() {
   return useNavigation<PreAuthNavigation>()
@@ -65,4 +84,8 @@ export function useBookingsNavigation() {
 
 export function useMessagesNavigation() {
   return useNavigation<MessagesNavigation>()
+}
+
+export function useHomeNavigation() {
+  return useNavigation<HomeNavigation>()
 }

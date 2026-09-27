@@ -85,7 +85,11 @@ export function LeaveFeedbackScreen({
                 onPress={() => setRating(value)}
               >
                 <StarIcon
-                  color={rating >= value ? bookingColors.star : bookingColors.textFaint}
+                  color={
+                    rating >= value
+                      ? bookingColors.star
+                      : bookingColors.textFaint
+                  }
                   filled={rating >= value}
                   size={30}
                 />
@@ -108,7 +112,10 @@ export function LeaveFeedbackScreen({
                 style={[styles.tag, isSelected && styles.tagSelected]}
               >
                 <Text
-                  style={[styles.tagLabel, isSelected && styles.tagLabelSelected]}
+                  style={[
+                    styles.tagLabel,
+                    isSelected && styles.tagLabelSelected,
+                  ]}
                 >
                   {tag}
                 </Text>
@@ -132,7 +139,10 @@ export function LeaveFeedbackScreen({
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <BookingButton disabled={rating === 0} onPress={() => setSubmitted(true)}>
+        <BookingButton
+          disabled={rating === 0}
+          onPress={() => setSubmitted(true)}
+        >
           Submit
         </BookingButton>
       </View>

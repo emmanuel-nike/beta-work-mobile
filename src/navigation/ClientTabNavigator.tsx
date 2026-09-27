@@ -9,8 +9,8 @@ import {
   type DashboardTab,
 } from '../components/dashboard/DashboardShell';
 import { ClientProfileScreen } from '../screens/ClientProfileScreen';
-import { UserDashboardScreen } from '../screens/UserDashboardScreen';
 import { BookingsNavigator } from './BookingsNavigator';
+import { HomeNavigator } from './HomeNavigator';
 import { MessagesNavigator } from './MessagesNavigator';
 import type { ClientTabParamList } from './types';
 
@@ -27,13 +27,6 @@ function ClientTabBar({ state, navigation }: BottomTabBarProps) {
     activeName === 'profile'
       ? activeName
       : 'home';
-
-  // Screens pushed inside a tab's own stack (booking details, dispute,
-  // feedback) are full-screen in the design, so the tab bar steps aside.
-  const nestedState = activeRoute?.state;
-  if (nestedState != null && (nestedState.index ?? 0) > 0) {
-    return null;
-  }
 
   return (
     <DashboardTabBar
@@ -63,6 +56,10 @@ function ClientTabBar({ state, navigation }: BottomTabBarProps) {
   );
 }
 
+function renderClientTabBar(props: BottomTabBarProps) {
+  return <ClientTabBar {...props} />;
+}
+
 export function ClientTabNavigator() {
   return (
     <Tab.Navigator
@@ -70,9 +67,9 @@ export function ClientTabNavigator() {
       screenOptions={{
         headerShown: false,
       }}
-      tabBar={props => <ClientTabBar {...props} />}
+      tabBar={renderClientTabBar}
     >
-      <Tab.Screen component={UserDashboardScreen} name="home" />
+      <Tab.Screen component={HomeNavigator} name="home" />
       <Tab.Screen component={BookingsNavigator} name="bookings" />
       <Tab.Screen component={MessagesNavigator} name="messages" />
       <Tab.Screen component={ClientProfileScreen} name="profile" />

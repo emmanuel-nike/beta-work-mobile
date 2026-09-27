@@ -23,6 +23,8 @@ export type VerifyOtpResponse = Readonly<{
   verified: boolean;
 }>;
 
+export type ArtisanVerificationStatus = 'pending' | 'approved' | 'rejected';
+
 export type AuthTokenResponse = Readonly<{
   type: string;
   value: string;
@@ -33,9 +35,21 @@ export type AuthTokenResponse = Readonly<{
     lastName: string;
     email: string;
     phoneNumber: string;
+    address?: string | null;
+    city?: string | null;
+    state?: string | null;
     role: string;
-    isVerified?: boolean;
+    /** Present for artisan accounts; carries their verification status. */
+    artisanProfile?: {
+      verificationStatus: ArtisanVerificationStatus;
+    } | null;
   };
+}>;
+
+export type ArtisanStatusResponse = Readonly<{
+  verificationStatus: ArtisanVerificationStatus;
+  isVerified: boolean;
+  verifiedAt: string | null;
 }>;
 
 export type RegisterUserPayload = Readonly<{
@@ -48,6 +62,14 @@ export type RegisterUserPayload = Readonly<{
   state?: string;
   address?: string;
   role?: 'user' | 'artisan';
+}>;
+
+export type UpdateProfilePayload = Readonly<{
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phoneNumber?: string;
+  address?: string;
 }>;
 
 export async function validateUser(payload: ValidateUserPayload) {
@@ -101,6 +123,34 @@ export async function login(email: string, password: string) {
 export async function fetchCurrentUser() {
   return apiRequest<{ user: AuthTokenResponse['user'] }>('/auth/me', {
     method: 'GET',
+  });
+}
+
+export async function fetchArtisanStatus() {
+  return apiRequest<ArtisanStatusResponse>('/artisan/status', {
+    method: 'GET',
+  });
+}
+
+export async function updateProfile(payload: UpdateProfilePayload) {
+  return apiRequest<{ user: AuthTokenResponse['user'] }>('/auth/me', {
+    method: 'PUT',
+    body: {
+      ...payload,
+      phoneNumber: payload.phoneNumber
+        ? toE164Phone(payload.phoneNumber)
+        : undefined,
+    },
+  });
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+) {
+  return apiRequest<{ message?: string }>('/auth/password', {
+    method: 'PUT',
+    body: { currentPassword, newPassword },
   });
 }
 

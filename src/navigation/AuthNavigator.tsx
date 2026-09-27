@@ -1,5 +1,9 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { AllArtisansScreen } from '../screens/artisans/AllArtisansScreen';
+import { ArtisanProfileScreen } from '../screens/artisans/ArtisanProfileScreen';
+import { ChangePasswordScreen } from '../screens/profile/ChangePasswordScreen';
+import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
 import { BookingDetailsScreen } from '../screens/bookings/BookingDetailsScreen';
 import { LeaveFeedbackScreen } from '../screens/bookings/LeaveFeedbackScreen';
 import { RaiseDisputeScreen } from '../screens/bookings/RaiseDisputeScreen';
@@ -41,6 +45,26 @@ export function AuthNavigator() {
         component={LeaveFeedbackScreen}
         name="LeaveFeedback"
         options={{ contentStyle: { backgroundColor: bookingColors.surface } }}
+      />
+      <Stack.Screen
+        component={AllArtisansScreen}
+        name="AllArtisans"
+        options={{ contentStyle: { backgroundColor: '#F7F1E6' } }}
+      />
+      <Stack.Screen
+        component={ArtisanProfileScreen}
+        name="ArtisanProfile"
+        options={{ contentStyle: { backgroundColor: '#F4E9DA' } }}
+      />
+      <Stack.Screen
+        component={EditProfileScreen}
+        name="EditProfile"
+        options={{ contentStyle: { backgroundColor: '#E0D1BC' } }}
+      />
+      <Stack.Screen
+        component={ChangePasswordScreen}
+        name="ChangePassword"
+        options={{ contentStyle: { backgroundColor: '#E0D1BC' } }}
       />
     </Stack.Navigator>
   );

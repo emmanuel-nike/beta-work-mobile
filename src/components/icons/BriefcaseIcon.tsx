@@ -8,13 +8,20 @@ export function BriefcaseIcon({
   size = 28,
 }: SizedIconProps) {
   return (
-    <Svg fill="none" height={size} viewBox="0 0 28 28" width={size}>
+    <Svg fill="none" height={size} viewBox="0 0 20 20" width={size}>
       <Path
-        d="M8.167 8.167V6.417C8.167 5.655 8.789 5.042 9.542 5.042H18.458C19.211 5.042 19.833 5.655 19.833 6.417V8.167M6.417 8.167H21.583C22.733 8.167 23.667 9.101 23.667 10.25V21.583C23.667 22.733 22.733 23.667 21.583 23.667H6.417C5.267 23.667 4.333 22.733 4.333 21.583V10.25C4.333 9.101 5.267 8.167 6.417 8.167Z"
+        d="M13.3337 16.6667V3.33341C13.3337 2.89139 13.1581 2.46746 12.8455 2.1549C12.5329 1.84234 12.109 1.66675 11.667 1.66675H8.33366C7.89163 1.66675 7.46771 1.84234 7.15515 2.1549C6.84259 2.46746 6.66699 2.89139 6.66699 3.33341V16.6667"
         stroke={color}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.8}
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <Path
+        d="M16.667 5H3.33366C2.41318 5 1.66699 5.74619 1.66699 6.66667V15C1.66699 15.9205 2.41318 16.6667 3.33366 16.6667H16.667C17.5875 16.6667 18.3337 15.9205 18.3337 15V6.66667C18.3337 5.74619 17.5875 5 16.667 5Z"
+        stroke={color}
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
       />
     </Svg>
   );

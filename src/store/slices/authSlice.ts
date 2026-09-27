@@ -1,10 +1,14 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import {
+  fetchArtisanStatus,
   fetchCurrentUser,
+  updateProfile,
   login,
   logout as logoutRequest,
+  type ArtisanVerificationStatus,
   type AuthTokenResponse,
+  type UpdateProfilePayload,
 } from '../../api/auth';
 import { ApiError, setAuthToken } from '../../api/client';
 import {
@@ -118,6 +122,42 @@ export const refreshCurrentUser = createAsyncThunk<
   }
 });
 
+export const refreshArtisanStatus = createAsyncThunk<
+  ArtisanVerificationStatus,
+  void,
+  { rejectValue: number | undefined; state: { auth: AuthState } }
+>('auth/refreshArtisanStatus', async (_, { rejectWithValue }) => {
+  try {
+    const { verificationStatus } = await fetchArtisanStatus();
+    return verificationStatus;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return rejectWithValue(error.status);
+    }
+    return rejectWithValue(undefined);
+  }
+});
+
+export const updateUserProfile = createAsyncThunk<
+  AuthUser,
+  UpdateProfilePayload,
+  { rejectValue: string; state: { auth: AuthState } }
+>('auth/updateProfile', async (payload, { getState, rejectWithValue }) => {
+  try {
+    const { user } = await updateProfile(payload);
+    const { token, tokenType } = getState().auth;
+    if (token) {
+      await persistSession({ token, tokenType, user });
+    }
+    return user;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return rejectWithValue(error.message);
+    }
+    return rejectWithValue('Unable to update profile');
+  }
+});
+
 export const logoutUser = createAsyncThunk('auth/logout', async () => {
   try {
     await logoutRequest();
@@ -191,6 +231,22 @@ const authSlice = createSlice({
           return { ...initialState, isBootstrapping: false };
         }
       })
+      .addCase(updateUserProfile.fulfilled, (state, action) => {
+        state.user = action.payload;
+      })
+      .addCase(refreshArtisanStatus.fulfilled, (state, action) => {
+        if (state.user) {
+          state.user.artisanProfile = {
+            ...state.user.artisanProfile,
+            verificationStatus: action.payload,
+          };
+        }
+      })
+      .addCase(refreshArtisanStatus.rejected, (state, action) => {
+        if (action.payload === 401) {
+          return { ...initialState, isBootstrapping: false };
+        }
+      })
       .addCase(logoutUser.fulfilled, () => ({
         ...initialState,
         isBootstrapping: false,
@@ -234,5 +290,11 @@ export const selectIsArtisanVerified = (state: { auth: AuthState }) => {
   if (!user || user.role !== 'artisan') {
     return false;
   }
-  return user.isVerified ?? true;
+  // Approved is the only status that unlocks the full dashboard; anything
+  // else (pending, rejected, or unknown) keeps the artisan on the pending view.
+  return user.artisanProfile?.verificationStatus === 'approved';
 };
+
+export const selectArtisanVerificationStatus = (state: {
+  auth: AuthState;
+}) => state.auth.user?.artisanProfile?.verificationStatus;
