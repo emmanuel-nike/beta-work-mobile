@@ -37,6 +37,7 @@ import {
   type UpcomingRequest,
 } from '../data/artisanRequests';
 import { DEFAULT_LOCATION_LABEL, type SavedAddress } from '../data/locations';
+import { useAuthNavigation } from '../navigation/types';
 import { useAppSelector } from '../store/hooks';
 import { selectAuthUser } from '../store/slices/authSlice';
 import { dashboardColors } from '../theme/dashboard';
@@ -97,6 +98,7 @@ function UnderReviewDashboard({
   onLocationPress: () => void;
   user: ReturnType<typeof selectAuthUser>;
 }>) {
+  const navigation = useAuthNavigation();
   const fullName =
     [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() ||
     'Abigail Anioke';
@@ -134,6 +136,7 @@ function UnderReviewDashboard({
         />
         <Pressable
           accessibilityRole="button"
+          onPress={() => navigation.navigate('EditProfile')}
           style={({ pressed }) => [
             styles.editButton,
             pressed && styles.pressed,
