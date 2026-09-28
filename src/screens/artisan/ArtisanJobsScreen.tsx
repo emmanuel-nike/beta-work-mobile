@@ -1,73 +1,132 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { JobRequestCard } from '../../components/artisan/JobRequestCard';
-import { UpcomingRequestCard } from '../../components/artisan/UpcomingRequestCard';
-import { BookingsHeader } from '../../components/bookings/BookingsHeader';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useMemo, useState } from 'react';
 import {
-  NEW_JOB_REQUESTS,
-  UPCOMING_REQUESTS,
-} from '../../data/artisanRequests';
+  FlatList,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+
+import DashboardBookingsEmptyArtwork from '../../../assets/images/dashboard-bookings-empty.svg';
+import { ArtisanJobCard } from '../../components/artisan/ArtisanJobCard';
+import { BookingsHeader } from '../../components/bookings/BookingsHeader';
+import { BriefcaseIcon } from '../../components/icons';
+import {
+  ARTISAN_JOBS,
+  JOB_FILTERS,
+  JOB_STATUS_LABELS,
+  filterJobs,
+  type ArtisanJob,
+  type JobFilter,
+} from '../../data/artisanJobs';
+import { useAuthNavigation } from '../../navigation/types';
+import { useAppSelector } from '../../store/hooks';
+import { selectIsArtisanVerified } from '../../store/slices/authSlice';
 import { dashboardColors } from '../../theme/dashboard';
 
-type JobsTab = 'new' | 'upcoming';
-
-const TABS: ReadonlyArray<{ id: JobsTab; label: string }> = [
-  { id: 'new', label: 'New requests' },
-  { id: 'upcoming', label: 'Upcoming' },
-];
-
 export function ArtisanJobsScreen() {
-  const insets = useSafeAreaInsets();
-  const [tab, setTab] = useState<JobsTab>('new');
+  const tabBarHeight = useBottomTabBarHeight();
+  const navigation = useAuthNavigation();
+  const isVerified = useAppSelector(selectIsArtisanVerified);
+  const [filter, setFilter] = useState<JobFilter>('all');
+
+  const jobs = useMemo(
+    () => (isVerified ? filterJobs(ARTISAN_JOBS, filter) : []),
+    [filter, isVerified],
+  );
+  const hasAnyJobs = isVerified && ARTISAN_JOBS.length > 0;
+
+  const openJob = (job: ArtisanJob) =>
+    navigation.navigate('ArtisanJobDetail', { jobId: job.id });
 
   return (
     <View style={styles.root}>
       <BookingsHeader title="My Jobs" />
 
-      <View style={styles.tabRow}>
-        {TABS.map(item => {
-          const isActive = item.id === tab;
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: isActive }}
-              key={item.id}
-              onPress={() => setTab(item.id)}
-              style={[styles.tab, isActive && styles.tabActive]}
-            >
-              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
-                {item.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+      {hasAnyJobs && (
+        <ScrollView
+          contentContainerStyle={styles.chipRow}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipScroll}
+        >
+          {JOB_FILTERS.map(item => {
+            const isActive = item.id === filter;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
+                key={item.id}
+                onPress={() => setFilter(item.id)}
+                style={[styles.chip, isActive && styles.chipActive]}
+              >
+                <Text
+                  style={[styles.chipLabel, isActive && styles.chipLabelActive]}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+      <View style={{ flex: 1 }}>
+        {!hasAnyJobs ? (
+          <AllEmptyState />
+        ) : jobs.length === 0 ? (
+          <CategoryEmptyState filter={filter} />
+        ) : (
+          <FlatList
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: tabBarHeight + 24 },
+            ]}
+            data={jobs}
+            keyExtractor={item => item.id}
+            renderItem={({ item }) => (
+              <ArtisanJobCard job={item} onViewDetails={openJob} />
+            )}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </View>
+    </View>
+  );
+}
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: insets.bottom + 24 },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {tab === 'new'
-          ? NEW_JOB_REQUESTS.map(request => (
-              <JobRequestCard
-                key={request.id}
-                onViewDetails={() => {}}
-                request={request}
-              />
-            ))
-          : UPCOMING_REQUESTS.map(request => (
-              <UpcomingRequestCard
-                key={request.id}
-                onViewDetails={() => {}}
-                request={request}
-              />
-            ))}
-      </ScrollView>
+function AllEmptyState() {
+  return (
+    <View style={styles.allEmpty}>
+      <View style={styles.illustrationCircle}>
+        <DashboardBookingsEmptyArtwork height={150} width={192} />
+      </View>
+      <Text style={styles.emptyTitle}>No bookings yet</Text>
+      <Text style={styles.emptyBody}>
+        You currently have no active service requests. Find a verified
+        professional near you!
+      </Text>
+    </View>
+  );
+}
+
+function CategoryEmptyState({ filter }: Readonly<{ filter: JobFilter }>) {
+  const label =
+    filter === 'all' ? 'jobs' : JOB_STATUS_LABELS[filter].toLowerCase();
+
+  return (
+    <View style={styles.categoryEmptyWrap}>
+      <View style={styles.categoryEmptyCard}>
+        <View style={styles.categoryIcon}>
+          <BriefcaseIcon color={dashboardColors.textHelper} size={22} />
+        </View>
+        <Text style={styles.categoryTitle}>No {label} jobs</Text>
+        <Text style={styles.categoryBody}>
+          {filter === 'all' ? 'Jobs' : JOB_STATUS_LABELS[filter]} jobs will
+          appear here.
+        </Text>
+      </View>
     </View>
   );
 }
@@ -77,35 +136,98 @@ const styles = StyleSheet.create({
     backgroundColor: dashboardColors.artisanSurface,
     flex: 1,
   },
-  tabRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 24,
+  chipScroll: {
+    flexGrow: 0,
     paddingVertical: 16,
   },
-  tab: {
+  chipRow: {
+    gap: 8,
+    paddingHorizontal: 24,
+  },
+  chip: {
     alignItems: 'center',
-    backgroundColor: '#D8C7AD',
+    backgroundColor: dashboardColors.cardMuted,
     borderRadius: 18,
     height: 36,
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
-  tabActive: {
+  chipActive: {
     backgroundColor: dashboardColors.tabBar,
   },
-  tabLabel: {
+  chipLabel: {
     color: dashboardColors.textSecondary,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
-    lineHeight: 18,
+    lineHeight: 20,
   },
-  tabLabelActive: {
+  chipLabelActive: {
     color: dashboardColors.white,
     fontWeight: '600',
   },
-  content: {
+  listContent: {
     gap: 12,
     paddingHorizontal: 24,
   },
-})
+  allEmpty: {
+    marginTop: 45,
+    alignItems: 'center',
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+  },
+  illustrationCircle: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(196, 178, 148, 0.35)',
+    borderRadius: 130,
+    height: 260,
+    justifyContent: 'center',
+    width: 260,
+  },
+  emptyTitle: {
+    color: dashboardColors.textPrimary,
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 22,
+    marginTop: 8,
+  },
+  emptyBody: {
+    color: dashboardColors.textLabel,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    textAlign: 'center',
+  },
+  categoryEmptyWrap: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+  },
+  categoryEmptyCard: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderRadius: 8,
+    gap: 8,
+    paddingVertical: 28,
+  },
+  categoryIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(105, 81, 57, 0.1)',
+    borderRadius: 24,
+    height: 48,
+    justifyContent: 'center',
+    marginBottom: 4,
+    width: 48,
+  },
+  categoryTitle: {
+    color: dashboardColors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  categoryBody: {
+    color: dashboardColors.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+});
