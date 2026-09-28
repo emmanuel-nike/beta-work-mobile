@@ -29,6 +29,8 @@ import { useAppSelector } from '../../store/hooks';
 import { selectAuthUserRole } from '../../store/slices/authSlice';
 import { dashboardColors, getTimeGreeting } from '../../theme/dashboard';
 
+export const HEADER_CONTENT_OVERLAP = 50;
+
 export type DashboardTab =
   | 'home'
   | 'bookings'
@@ -46,6 +48,7 @@ type DashboardShellProps = Readonly<{
   showTabBar?: boolean;
   onTabPress?: (tab: DashboardTab) => void;
   contentStyle?: StyleProp<ViewStyle>;
+  roundedBodyTop?: boolean;
 }>;
 
 export function DashboardShell({
@@ -58,8 +61,19 @@ export function DashboardShell({
   showTabBar = true,
   onTabPress,
   contentStyle,
+  roundedBodyTop = false,
 }: DashboardShellProps) {
   const insets = useSafeAreaInsets();
+  const bodyTopStyle: ViewStyle = {
+    backgroundColor,
+    ...(roundedBodyTop
+      ? {
+          borderTopLeftRadius: 40,
+          borderTopRightRadius: 40,
+          marginTop: -HEADER_CONTENT_OVERLAP,
+        }
+      : null),
+  };
 
   return (
     <View style={[styles.root, { backgroundColor }]}>
@@ -77,7 +91,9 @@ export function DashboardShell({
           style={styles.scroll}
         >
           {scrollHeader}
-          <View style={[styles.contentWrapper, contentStyle]}>{children}</View>
+          <View style={[styles.contentWrapper, contentStyle, bodyTopStyle]}>
+            {children}
+          </View>
         </ScrollView>
       ) : (
         <>
@@ -131,30 +147,29 @@ type DashboardHeaderProps = Readonly<{
   firstName: string;
   location?: string;
   subtitle?: string;
-  height?: number;
   footer?: ReactNode;
   onLocationPress?: () => void;
+  paddingBottom?: number;
 }>;
 
 export function DashboardHeader({
   firstName,
   location = 'Maitaima, Abuja',
   subtitle,
-  height = 220,
   footer,
   onLocationPress,
+  paddingBottom = 16,
 }: DashboardHeaderProps) {
   const insets = useSafeAreaInsets();
   const greeting = getTimeGreeting();
 
   return (
-    <View style={[styles.header, { minHeight: height + insets.top }]}>
+    <View style={styles.header}>
       <DashboardHeaderBackground />
       <View
         style={[
           styles.headerForeground,
-          footer ? styles.headerForegroundWithFooter : null,
-          { paddingTop: insets.top + 8 },
+          { paddingBottom, paddingTop: insets.top + 8 },
         ]}
       >
         <View style={styles.headerTopRow}>
@@ -180,12 +195,7 @@ export function DashboardHeader({
             <BellIcon />
           </Pressable>
         </View>
-        <View
-          style={[
-            styles.headerCopy,
-            footer ? styles.headerCopyWithFooter : null,
-          ]}
-        >
+        <View style={styles.headerCopy}>
           <Text style={styles.greeting}>
             {greeting}, {firstName} 👋
           </Text>
@@ -211,7 +221,7 @@ const TAB_ITEMS: ReadonlyArray<{
 }> = [
   { id: 'home', label: 'Home', Icon: HomeIcon },
   { id: 'bookings', label: 'Bookings', Icon: BookingsIcon },
-  { id: 'jobs', label: 'Jobs', Icon: JobsIcon },
+  { id: 'jobs', label: 'My Jobs', Icon: JobsIcon },
   { id: 'messages', label: 'Messages', Icon: MessagesIcon },
   { id: 'profile', label: 'Profile', Icon: ProfileIcon },
 ];
@@ -265,27 +275,53 @@ type SearchBarProps = Readonly<{
   placeholder?: string;
   value?: string;
   onChangeText?: (value: string) => void;
+  /** When set the bar acts as a button that opens a dedicated search screen. */
+  onPress?: () => void;
 }>;
 
 export function SearchBar({
   placeholder = 'Search for artisans or services',
   value,
   onChangeText,
+  onPress,
 }: SearchBarProps) {
+  const field = (
+    <TextInput
+      autoCapitalize="none"
+      autoCorrect={false}
+      editable={onPress == null}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor="rgba(255,255,255,0.65)"
+      pointerEvents={onPress == null ? 'auto' : 'none'}
+      returnKeyType="search"
+      style={styles.searchInput}
+      value={value}
+    />
+  );
+
+  if (onPress == null) {
+    return (
+      <View style={styles.searchBar}>
+        <SearchIcon />
+        {field}
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.searchBar}>
+    <Pressable
+      accessibilityLabel={placeholder}
+      accessibilityRole="search"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.searchBar,
+        pressed && styles.searchPressed,
+      ]}
+    >
       <SearchIcon />
-      <TextInput
-        autoCapitalize="none"
-        autoCorrect={false}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor="rgba(255,255,255,0.65)"
-        returnKeyType="search"
-        style={styles.searchInput}
-        value={value}
-      />
-    </View>
+      {field}
+    </Pressable>
   );
 }
 
@@ -346,12 +382,8 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   headerForeground: {
-    paddingBottom: 24,
     paddingHorizontal: 24,
     zIndex: 1,
-  },
-  headerForegroundWithFooter: {
-    paddingBottom: 20,
   },
   headerOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -386,11 +418,8 @@ const styles = StyleSheet.create({
   },
   headerCopy: {
     gap: 4,
-    marginBottom: 40,
-    marginTop: 12,
-  },
-  headerCopyWithFooter: {
     marginBottom: 16,
+    marginTop: 12,
   },
   headerFooter: {
     marginTop: 4,
@@ -449,6 +478,9 @@ const styles = StyleSheet.create({
     gap: 10,
     height: 56,
     paddingHorizontal: 16,
+  },
+  searchPressed: {
+    opacity: 0.8,
   },
   searchInput: {
     color: dashboardColors.white,

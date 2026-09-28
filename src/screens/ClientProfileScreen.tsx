@@ -34,6 +34,7 @@ import {
   TrashIcon,
   type SizedIconProps,
 } from '../components/icons';
+import { useAuthNavigation } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logoutUser, selectAuthUser } from '../store/slices/authSlice';
 import { appColors } from '../theme/clientApp';
@@ -48,6 +49,7 @@ const PICKER_OPTIONS: ImageLibraryOptions = {
 
 export function ClientProfileScreen() {
   const dispatch = useAppDispatch();
+  const navigation = useAuthNavigation();
   const user = useAppSelector(selectAuthUser);
   const insets = useSafeAreaInsets();
 
@@ -166,6 +168,7 @@ export function ClientProfileScreen() {
           <Section title="Account">
             <ProfileRow
               Icon={ProfileIcon}
+              onPress={() => navigation.navigate('EditProfile')}
               subtitle="Update your personal details"
               title="Personal details"
             />
@@ -176,6 +179,7 @@ export function ClientProfileScreen() {
             />
             <ProfileRow
               Icon={LockIcon}
+              onPress={() => navigation.navigate('ChangePassword')}
               subtitle="Change your password"
               title="Change Password"
             />

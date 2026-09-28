@@ -1,20 +1,18 @@
 import { useEffect } from 'react';
 
+import { ArtisanTabNavigator } from '../navigation/ArtisanTabNavigator';
 import { ClientTabNavigator } from '../navigation/ClientTabNavigator';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   refreshCurrentUser,
   selectAuthToken,
   selectAuthUser,
-  selectIsArtisanVerified,
 } from '../store/slices/authSlice';
-import { ArtisanDashboardScreen } from './ArtisanDashboardScreen';
 
 export function DashboardScreen() {
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectAuthUser);
   const token = useAppSelector(selectAuthToken);
-  const isArtisanVerified = useAppSelector(selectIsArtisanVerified);
   const isArtisan = user?.role === 'artisan';
 
   useEffect(() => {
@@ -30,7 +28,7 @@ export function DashboardScreen() {
   }, [dispatch, token]);
 
   if (isArtisan) {
-    return <ArtisanDashboardScreen isVerified={isArtisanVerified} />;
+    return <ArtisanTabNavigator />;
   }
 
   return <ClientTabNavigator />;
