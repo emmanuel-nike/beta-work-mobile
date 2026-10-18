@@ -18,6 +18,7 @@ import {
   BriefcaseIcon,
   CalendarIcon,
   CheckCircleIcon,
+  ChevronRightIcon,
   EditIcon,
   LockIcon,
   StarIcon,
@@ -121,6 +122,7 @@ function UnderReviewDashboard({
       showTabBar={false}
     >
       <ApprovalChecklist
+        onPress={() => navigation.navigate('ArtisanPortfolio')}
         tasks={LOCKED_PROFILE_TASKS}
         title="What you can do after approval"
       />
@@ -164,6 +166,7 @@ function ApprovedDashboard({
   location: string;
   onLocationPress: () => void;
 }>) {
+  const navigation = useAuthNavigation();
   const [profileTasks] = useState(ARTISAN_PROFILE_TASKS);
   const profileComplete = isProfileSetupComplete(profileTasks);
   const completionPercent = getProfileCompletionPercent(profileTasks);
@@ -194,6 +197,7 @@ function ApprovedDashboard({
     >
       {profileComplete ? null : (
         <ApprovalChecklist
+          onPress={() => navigation.navigate('ArtisanPortfolio')}
           tasks={profileTasks}
           title="What you can do after approval"
         />
@@ -286,22 +290,43 @@ function ApprovedDashboard({
 function ApprovalChecklist({
   title,
   tasks,
-}: Readonly<{ title: string; tasks: readonly ArtisanProfileTask[] }>) {
+  onPress,
+}: Readonly<{
+  title: string;
+  tasks: readonly ArtisanProfileTask[];
+  onPress?: () => void;
+}>) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <DashboardCard style={styles.checklistCard}>
-        {tasks.map(task => (
-          <View key={task.id} style={styles.checklistRow}>
-            {task.completed ? (
-              <CheckCircleIcon color={dashboardColors.textHelper} size={18} />
-            ) : (
-              <LockIcon color={dashboardColors.textHelper} size={16} />
-            )}
-            <Text style={styles.checklistText}>{task.label}</Text>
-          </View>
-        ))}
-      </DashboardCard>
+      <Pressable
+        accessibilityHint={
+          onPress ? 'Opens the update your portfolio form' : undefined
+        }
+        accessibilityRole={onPress ? 'button' : undefined}
+        disabled={!onPress}
+        onPress={onPress}
+        style={({ pressed }) => pressed && onPress ? styles.pressed : undefined}
+      >
+        <DashboardCard style={styles.checklistCard}>
+          {tasks.map(task => (
+            <View key={task.id} style={styles.checklistRow}>
+              {task.completed ? (
+                <CheckCircleIcon color={dashboardColors.textHelper} size={18} />
+              ) : (
+                <LockIcon color={dashboardColors.textHelper} size={16} />
+              )}
+              <Text style={styles.checklistText}>{task.label}</Text>
+            </View>
+          ))}
+          {onPress ? (
+            <View style={styles.checklistCta}>
+              <Text style={styles.checklistCtaText}>Update your portfolio</Text>
+              <ChevronRightIcon color={dashboardColors.tabBar} size={18} />
+            </View>
+          ) : null}
+        </DashboardCard>
+      </Pressable>
     </View>
   );
 }
@@ -407,6 +432,21 @@ const styles = StyleSheet.create({
     color: dashboardColors.textPrimary,
     flex: 1,
     fontSize: 13,
+    lineHeight: 18,
+  },
+  checklistCta: {
+    alignItems: 'center',
+    borderTopColor: dashboardColors.cardMuted,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    paddingTop: 12,
+  },
+  checklistCtaText: {
+    color: dashboardColors.tabBar,
+    fontSize: 13,
+    fontWeight: '700',
     lineHeight: 18,
   },
   infoCard: {

@@ -46,6 +46,7 @@ export type AuthStackParamList = {
   EditProfile: undefined
   ChangePassword: undefined
   ArtisanJobDetail: { jobId: string }
+  ArtisanPortfolio: undefined
 }
 
 export type PreAuthNavigation = NativeStackNavigationProp<PreAuthStackParamList>
