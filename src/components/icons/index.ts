@@ -45,4 +45,5 @@ export { StarIcon } from './StarIcon';
 export { StickerIcon } from './StickerIcon';
 export { SuccessCheckIcon } from './SuccessCheckIcon';
 export { TrashIcon } from './TrashIcon';
+export { UploadIcon } from './UploadIcon';
 export type { IconColorProps, SizedIconProps } from './types';

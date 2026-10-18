@@ -10,7 +10,12 @@ import {
   type AuthTokenResponse,
   type UpdateProfilePayload,
 } from '../../api/auth';
+import {
+  updateArtisanPortfolio,
+  type ArtisanProfileData,
+} from '../../api/artisan';
 import { ApiError, setAuthToken } from '../../api/client';
+import type { PortfolioForm } from '../../data/artisanPortfolio';
 import {
   clearStoredSession,
   loadStoredSession,
@@ -155,6 +160,23 @@ export const updateUserProfile = createAsyncThunk<
       return rejectWithValue(error.message);
     }
     return rejectWithValue('Unable to update profile');
+  }
+});
+
+export const submitArtisanPortfolio = createAsyncThunk<
+  ArtisanProfileData,
+  PortfolioForm,
+  { rejectValue: string }
+>('auth/submitArtisanPortfolio', async (form, { rejectWithValue }) => {
+  try {
+    const { artisanProfile } = await updateArtisanPortfolio(form);
+    return artisanProfile;
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof ApiError
+        ? error.message
+        : 'Could not save your portfolio. Please try again.',
+    );
   }
 });
 
