@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -11,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { portfolioFormFromProfile } from '../../api/artisan';
 import { BookingsHeader } from '../../components/bookings/BookingsHeader';
 import { PortfolioHoursStep } from '../../components/portfolio/PortfolioHoursStep';
 import { PortfolioServiceStep } from '../../components/portfolio/PortfolioServiceStep';
@@ -21,8 +23,12 @@ import {
   type PortfolioForm,
 } from '../../data/artisanPortfolio';
 import type { AuthStackScreenProps } from '../../navigation/types';
-import { useAppDispatch } from '../../store/hooks';
-import { submitArtisanPortfolio } from '../../store/slices/authSlice';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import {
+  loadArtisanProfile,
+  selectArtisanProfile,
+  submitArtisanPortfolio,
+} from '../../store/slices/authSlice';
 import { appColors } from '../../theme/clientApp';
 
 const TOTAL_STEPS = 3;
@@ -32,10 +38,40 @@ export function ArtisanPortfolioScreen({
 }: AuthStackScreenProps<'ArtisanPortfolio'>) {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
+  const savedProfile = useAppSelector(selectArtisanProfile);
 
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState<PortfolioForm>(createDefaultPortfolioForm);
+  // Seed from whatever profile is already in the store so the form is never
+  // blank on open; refresh from the API below to pick up the latest save.
+  const [form, setForm] = useState<PortfolioForm>(() =>
+    savedProfile
+      ? portfolioFormFromProfile(savedProfile)
+      : createDefaultPortfolioForm(),
+  );
+  const [loading, setLoading] = useState(!savedProfile);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    dispatch(loadArtisanProfile())
+      .unwrap()
+      .then(profile => {
+        if (active && profile) {
+          setForm(portfolioFormFromProfile(profile));
+        }
+      })
+      .catch(() => {
+        // Keep whatever we already have (store seed or defaults).
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [dispatch]);
 
   const update = (patch: Partial<PortfolioForm>) =>
     setForm(current => ({ ...current, ...patch }));
@@ -124,33 +160,48 @@ export function ArtisanPortfolioScreen({
         ))}
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {step === 0 ? <PortfolioServiceStep form={form} update={update} /> : null}
-        {step === 1 ? <PortfolioWorkStep form={form} update={update} /> : null}
-        {step === 2 ? <PortfolioHoursStep form={form} update={update} /> : null}
-      </ScrollView>
+      {loading ? (
+        <View style={styles.loader}>
+          <ActivityIndicator color={appColors.primary} size="large" />
+          <Text style={styles.loaderText}>Loading your portfolio…</Text>
+        </View>
+      ) : (
+        <>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {step === 0 ? (
+              <PortfolioServiceStep form={form} update={update} />
+            ) : null}
+            {step === 1 ? (
+              <PortfolioWorkStep form={form} update={update} />
+            ) : null}
+            {step === 2 ? (
+              <PortfolioHoursStep form={form} update={update} />
+            ) : null}
+          </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: saving }}
-          disabled={saving}
-          onPress={handleNext}
-          style={({ pressed }) => [
-            styles.button,
-            (pressed || saving) && styles.buttonPressed,
-          ]}
-        >
-          <Text style={styles.buttonLabel}>
-            {isLastStep ? (saving ? 'Submitting…' : 'Submit') : 'Next'}
-          </Text>
-          <Text style={styles.buttonArrow}>→</Text>
-        </Pressable>
-      </View>
+          <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: saving }}
+              disabled={saving}
+              onPress={handleNext}
+              style={({ pressed }) => [
+                styles.button,
+                (pressed || saving) && styles.buttonPressed,
+              ]}
+            >
+              <Text style={styles.buttonLabel}>
+                {isLastStep ? (saving ? 'Submitting…' : 'Submit') : 'Next'}
+              </Text>
+              <Text style={styles.buttonArrow}>→</Text>
+            </Pressable>
+          </View>
+        </>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -180,6 +231,17 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     paddingHorizontal: 24,
     paddingTop: 20,
+  },
+  loader: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+    justifyContent: 'center',
+  },
+  loaderText: {
+    color: appColors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
   },
   footer: {
     backgroundColor: appColors.surface,

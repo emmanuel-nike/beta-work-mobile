@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -34,9 +34,15 @@ import {
   TrashIcon,
   type SizedIconProps,
 } from '../components/icons';
+import { toAbsoluteMediaUrl } from '../config/env';
 import { useAuthNavigation } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { logoutUser, selectAuthUser } from '../store/slices/authSlice';
+import {
+  loadArtisanProfile,
+  selectArtisanProfile,
+  selectAuthUser,
+  logoutUser,
+} from '../store/slices/authSlice';
 import { appColors } from '../theme/clientApp';
 
 const PICKER_OPTIONS: ImageLibraryOptions = {
@@ -51,11 +57,23 @@ export function ClientProfileScreen() {
   const dispatch = useAppDispatch();
   const navigation = useAuthNavigation();
   const user = useAppSelector(selectAuthUser);
+  const artisanProfile = useAppSelector(selectArtisanProfile);
   const insets = useSafeAreaInsets();
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSheetVisible, setSheetVisible] = useState(false);
+  // A locally picked photo overrides the saved one; otherwise show the saved
+  // profile picture from the artisan's portfolio.
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const savedPhoto = toAbsoluteMediaUrl(artisanProfile?.photoUrl);
+  const displayedAvatar = avatarUri ?? savedPhoto;
+
+  // Ensure the saved photo is available even if the home tab wasn't opened yet.
+  useEffect(() => {
+    if (user?.role === 'artisan' && !artisanProfile) {
+      dispatch(loadArtisanProfile());
+    }
+  }, [dispatch, user?.role, artisanProfile]);
   const [isSwitchingRole, setSwitchingRole] = useState(user?.role === 'artisan');
   const [pushEnabled, setPushEnabled] = useState(false);
 
@@ -128,8 +146,8 @@ export function ClientProfileScreen() {
             onPress={() => setSheetVisible(true)}
             style={({ pressed }) => [styles.avatarWrapper, pressed && styles.pressed]}
           >
-            {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.avatar} />
+            {displayedAvatar ? (
+              <Image source={{ uri: displayedAvatar }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, styles.avatarEmpty]}>
                 <AvatarPlaceholderIcon />
@@ -174,6 +192,7 @@ export function ClientProfileScreen() {
             />
             <ProfileRow
               Icon={BriefcaseIcon}
+              onPress={() => navigation.navigate('ArtisanPortfolio')}
               subtitle="Update your work profile"
               title="Job Profile"
             />
@@ -232,7 +251,7 @@ export function ClientProfileScreen() {
       </ScrollView>
 
       <AvatarPickerSheet
-        hasPhoto={avatarUri !== null}
+        hasPhoto={displayedAvatar !== null}
         onChooseFromGallery={handleChooseFromGallery}
         onClose={() => setSheetVisible(false)}
         onRemovePhoto={() => {

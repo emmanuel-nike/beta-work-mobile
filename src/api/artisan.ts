@@ -1,7 +1,11 @@
-import type {
-  PortfolioForm,
-  ServicePrice,
-  WeeklySchedule,
+import { toAbsoluteMediaUrl, toRelativeMediaPath } from '../config/env';
+import {
+  WEEKDAYS,
+  createDefaultPortfolioForm,
+  createServiceRow,
+  type PortfolioForm,
+  type ServicePrice,
+  type WeeklySchedule,
 } from '../data/artisanPortfolio';
 import { apiRequest } from './client';
 
@@ -107,7 +111,9 @@ export async function updateArtisanPortfolio(form: PortfolioForm) {
     if (isLocalUri(uri)) {
       body.append('portfolioImages', fileFromUri(uri, `portfolio-${index}`));
     } else {
-      keepImages.push(uri);
+      // Send the stored (relative) path so it matches what the server kept,
+      // otherwise it would treat the originals as removed and delete them.
+      keepImages.push(toRelativeMediaPath(uri));
     }
   });
   // Tell the server which already-hosted portfolio images to retain.
@@ -117,4 +123,71 @@ export async function updateArtisanPortfolio(form: PortfolioForm) {
     method: 'PUT',
     formData: body,
   });
+}
+
+/** Fetch the authenticated artisan's saved profile, or null if none exists. */
+export async function fetchArtisanProfile(): Promise<ArtisanProfileData | null> {
+  const { artisanProfile } = await apiRequest<ArtisanProfileResponse>(
+    '/artisan/profile',
+    { method: 'GET' },
+  );
+  return artisanProfile ?? null;
+}
+
+/**
+ * Map a saved profile onto the wizard's form shape so "Update your portfolio"
+ * opens pre-filled. Stored media paths become absolute urls, which the submit
+ * flow treats as already-hosted (kept, not re-uploaded).
+ */
+export function portfolioFormFromProfile(
+  profile: ArtisanProfileData,
+): PortfolioForm {
+  const base = createDefaultPortfolioForm();
+
+  const servicePricing: ServicePrice[] =
+    profile.servicePricing && profile.servicePricing.length > 0
+      ? profile.servicePricing.map(row => ({
+          ...createServiceRow(),
+          service: row.service ?? '',
+          minPrice: row.minPrice != null ? String(row.minPrice) : '',
+          maxPrice: row.maxPrice != null ? String(row.maxPrice) : '',
+        }))
+      : base.servicePricing;
+
+  // Merge saved days onto the default week so every weekday stays present.
+  const weeklySchedule = { ...base.weeklySchedule };
+  if (profile.weeklySchedule) {
+    for (const day of WEEKDAYS) {
+      const saved = profile.weeklySchedule[day];
+      if (saved) {
+        weeklySchedule[day] = {
+          enabled: Boolean(saved.enabled),
+          start: saved.start ?? '',
+          end: saved.end ?? '',
+        };
+      }
+    }
+  }
+
+  return {
+    ...base,
+    photoUri: toAbsoluteMediaUrl(profile.photoUrl),
+    primarySkill: profile.trade ?? '',
+    otherServices: profile.additionalServices ?? [],
+    yearsOfExperience:
+      profile.yearsOfExperience != null ? String(profile.yearsOfExperience) : '',
+    certificateUri: toAbsoluteMediaUrl(profile.certificateUrl),
+    bio: profile.bio ?? '',
+    languages: profile.languages ?? [],
+    portfolioImages: (profile.portfolioImages ?? [])
+      .map(url => toAbsoluteMediaUrl(url))
+      .filter((url): url is string => Boolean(url)),
+    servicePricing,
+    isAvailable: profile.isAvailable ?? true,
+    minimumLeadTimeHours:
+      profile.minimumLeadTimeHours != null
+        ? String(profile.minimumLeadTimeHours)
+        : '',
+    weeklySchedule,
+  };
 }
