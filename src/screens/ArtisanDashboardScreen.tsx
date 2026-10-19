@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ArtisanStatCard } from '../components/artisan/ArtisanStatCard';
@@ -28,6 +28,7 @@ import {
   ARTISAN_PROFILE_TASKS,
   ARTISAN_STATS,
   ARTISAN_TESTIMONIALS,
+  buildArtisanProfileTasks,
   getProfileCompletionPercent,
   isProfileSetupComplete,
   NEW_JOB_REQUESTS,
@@ -40,7 +41,7 @@ import {
 import { DEFAULT_LOCATION_LABEL, type SavedAddress } from '../data/locations';
 import { useAuthNavigation } from '../navigation/types';
 import { useAppSelector } from '../store/hooks';
-import { selectAuthUser } from '../store/slices/authSlice';
+import { selectArtisanProfile, selectAuthUser } from '../store/slices/authSlice';
 import { dashboardColors } from '../theme/dashboard';
 
 const LOCKED_PROFILE_TASKS: readonly ArtisanProfileTask[] =
@@ -167,7 +168,13 @@ function ApprovedDashboard({
   onLocationPress: () => void;
 }>) {
   const navigation = useAuthNavigation();
-  const [profileTasks] = useState(ARTISAN_PROFILE_TASKS);
+  const artisanProfile = useAppSelector(selectArtisanProfile);
+  // The last checklist item unlocks once the artisan receives a real request.
+  const hasJobRequest = NEW_JOB_REQUESTS.length > 0;
+  const profileTasks = useMemo(
+    () => buildArtisanProfileTasks(artisanProfile, hasJobRequest),
+    [artisanProfile, hasJobRequest],
+  );
   const profileComplete = isProfileSetupComplete(profileTasks);
   const completionPercent = getProfileCompletionPercent(profileTasks);
   const onViewRequest = (_request: JobRequest) => {};

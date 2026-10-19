@@ -1,5 +1,7 @@
 import type { ImageSourcePropType } from 'react-native';
 
+import type { ArtisanProfileData } from '../api/artisan';
+
 export type JobRequestStatus = 'new' | 'pending';
 
 export type JobRequest = Readonly<{
@@ -116,6 +118,40 @@ export const ARTISAN_PROFILE_TASKS: readonly ArtisanProfileTask[] = [
     completed: false,
   },
 ];
+
+/**
+ * Build the profile-setup checklist from the artisan's saved portfolio plus
+ * whether they have received a job request yet. Each task is marked complete
+ * from real data so the dashboard reflects actual progress.
+ */
+export function buildArtisanProfileTasks(
+  profile: ArtisanProfileData | null,
+  hasJobRequest: boolean,
+): ArtisanProfileTask[] {
+  const hasServices =
+    Boolean(profile?.bio) || (profile?.additionalServices?.length ?? 0) > 0;
+  const hasPortfolioImages = (profile?.portfolioImages?.length ?? 0) > 0;
+  const hasPricing = (profile?.servicePricing?.length ?? 0) > 0;
+
+  return [
+    { id: 'add-services', label: 'Add services you offer', completed: hasServices },
+    {
+      id: 'upload-portfolio',
+      label: 'Upload pictures of past work',
+      completed: hasPortfolioImages,
+    },
+    {
+      id: 'set-pricing',
+      label: 'Set pricing and job duration',
+      completed: hasPricing,
+    },
+    {
+      id: 'receive-requests',
+      label: 'Start receiving job requests',
+      completed: hasJobRequest,
+    },
+  ];
+}
 
 export function getProfileCompletionPercent(
   tasks: readonly ArtisanProfileTask[],

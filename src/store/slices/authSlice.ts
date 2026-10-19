@@ -11,6 +11,7 @@ import {
   type UpdateProfilePayload,
 } from '../../api/auth';
 import {
+  fetchArtisanProfile,
   updateArtisanPortfolio,
   type ArtisanProfileData,
 } from '../../api/artisan';
@@ -36,6 +37,8 @@ type AuthState = {
   token: string | null;
   tokenType: string | null;
   user: AuthUser | null;
+  /** The authenticated artisan's full saved portfolio, once loaded. */
+  artisanProfile: ArtisanProfileData | null;
   status: 'idle' | 'loading' | 'failed';
   error: string | null;
 };
@@ -46,6 +49,7 @@ const initialState: AuthState = {
   token: null,
   tokenType: null,
   user: null,
+  artisanProfile: null,
   status: 'idle',
   error: null,
 };
@@ -163,6 +167,25 @@ export const updateUserProfile = createAsyncThunk<
   }
 });
 
+export const loadArtisanProfile = createAsyncThunk<
+  ArtisanProfileData | null,
+  void,
+  { rejectValue: number | undefined }
+>('auth/loadArtisanProfile', async (_, { rejectWithValue }) => {
+  try {
+    return await fetchArtisanProfile();
+  } catch (error) {
+    // A 404 simply means no profile has been saved yet.
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+    if (error instanceof ApiError) {
+      return rejectWithValue(error.status);
+    }
+    return rejectWithValue(undefined);
+  }
+});
+
 export const submitArtisanPortfolio = createAsyncThunk<
   ArtisanProfileData,
   PortfolioForm,
@@ -256,6 +279,12 @@ const authSlice = createSlice({
       .addCase(updateUserProfile.fulfilled, (state, action) => {
         state.user = action.payload;
       })
+      .addCase(loadArtisanProfile.fulfilled, (state, action) => {
+        state.artisanProfile = action.payload;
+      })
+      .addCase(submitArtisanPortfolio.fulfilled, (state, action) => {
+        state.artisanProfile = action.payload;
+      })
       .addCase(refreshArtisanStatus.fulfilled, (state, action) => {
         if (state.user) {
           state.user.artisanProfile = {
@@ -305,6 +334,8 @@ export const selectAuthUser = (state: { auth: AuthState }) => state.auth.user;
 export const selectAuthStatus = (state: { auth: AuthState }) => state.auth.status;
 export const selectAuthError = (state: { auth: AuthState }) => state.auth.error;
 export const selectAuthToken = (state: { auth: AuthState }) => state.auth.token;
+export const selectArtisanProfile = (state: { auth: AuthState }) =>
+  state.auth.artisanProfile;
 export const selectAuthUserRole = (state: { auth: AuthState }) =>
   state.auth.user?.role;
 export const selectIsArtisanVerified = (state: { auth: AuthState }) => {
