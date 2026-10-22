@@ -5,15 +5,16 @@ import { ClientTabNavigator } from '../navigation/ClientTabNavigator';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   refreshCurrentUser,
+  selectAppMode,
   selectAuthToken,
-  selectAuthUser,
+  selectIsArtisan,
 } from '../store/slices/authSlice';
 
 export function DashboardScreen() {
   const dispatch = useAppDispatch();
-  const user = useAppSelector(selectAuthUser);
+  const isArtisan = useAppSelector(selectIsArtisan);
+  const appMode = useAppSelector(selectAppMode);
   const token = useAppSelector(selectAuthToken);
-  const isArtisan = user?.role === 'artisan';
 
   useEffect(() => {
     if (!token) {
@@ -27,7 +28,9 @@ export function DashboardScreen() {
     return () => clearTimeout(timer);
   }, [dispatch, token]);
 
-  if (isArtisan) {
+  // An artisan is also a regular user, so they only see the artisan experience
+  // while artisan mode is active; otherwise they use the app as a client.
+  if (isArtisan && appMode === 'artisan') {
     return <ArtisanTabNavigator />;
   }
 
