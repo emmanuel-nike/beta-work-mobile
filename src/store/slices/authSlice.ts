@@ -31,17 +31,34 @@ export type AuthSession = Readonly<{
   user: AuthUser;
 }>;
 
+/**
+ * Which experience the app is currently showing. An artisan is also a regular
+ * user, so they can switch between running the app as an artisan or as a
+ * client. Non-artisan accounts are always in client mode.
+ */
+export type AppMode = 'artisan' | 'client';
+
 type AuthState = {
   isAuthenticated: boolean;
   isBootstrapping: boolean;
   token: string | null;
   tokenType: string | null;
   user: AuthUser | null;
+  /** The experience currently active for the signed-in user. */
+  appMode: AppMode;
   /** The authenticated artisan's full saved portfolio, once loaded. */
   artisanProfile: ArtisanProfileData | null;
   status: 'idle' | 'loading' | 'failed';
   error: string | null;
 };
+
+/**
+ * The mode an account lands in when it first signs in: artisans default to the
+ * artisan experience, everyone else to the client experience.
+ */
+function defaultAppMode(user: AuthUser | null | undefined): AppMode {
+  return user?.role === 'artisan' ? 'artisan' : 'client';
+}
 
 const initialState: AuthState = {
   isAuthenticated: false,
@@ -49,6 +66,7 @@ const initialState: AuthState = {
   token: null,
   tokenType: null,
   user: null,
+  appMode: 'client',
   artisanProfile: null,
   status: 'idle',
   error: null,
@@ -222,8 +240,16 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       state.tokenType = action.payload.tokenType;
       state.user = action.payload.user;
+      state.appMode = defaultAppMode(action.payload.user);
       state.status = 'idle';
       state.error = null;
+    },
+    setAppMode(state, action: PayloadAction<AppMode>) {
+      // Only artisans may enter artisan mode; everyone else stays a client.
+      state.appMode =
+        action.payload === 'artisan' && state.user?.role !== 'artisan'
+          ? 'client'
+          : action.payload;
     },
     signOut() {
       return { ...initialState, isBootstrapping: false };
@@ -247,6 +273,7 @@ const authSlice = createSlice({
           state.token = action.payload.token;
           state.tokenType = action.payload.tokenType;
           state.user = action.payload.user;
+          state.appMode = defaultAppMode(action.payload.user);
         }
       })
       .addCase(bootstrapAuth.rejected, state => {
@@ -261,6 +288,7 @@ const authSlice = createSlice({
         state.token = action.payload.token;
         state.tokenType = action.payload.tokenType;
         state.user = action.payload.user;
+        state.appMode = defaultAppMode(action.payload.user);
         state.status = 'idle';
         state.error = null;
       })
@@ -270,6 +298,11 @@ const authSlice = createSlice({
       })
       .addCase(refreshCurrentUser.fulfilled, (state, action) => {
         state.user = action.payload;
+        // Preserve an artisan's chosen mode, but never leave a non-artisan
+        // account stranded in artisan mode.
+        if (action.payload.role !== 'artisan') {
+          state.appMode = 'client';
+        }
       })
       .addCase(refreshCurrentUser.rejected, (state, action) => {
         if (action.payload === 401) {
@@ -305,7 +338,8 @@ const authSlice = createSlice({
   },
 });
 
-export const { setSession, signOut, clearAuthError } = authSlice.actions;
+export const { setSession, setAppMode, signOut, clearAuthError } =
+  authSlice.actions;
 export const authReducer = authSlice.reducer;
 export { sessionFromTokenResponse };
 
@@ -338,6 +372,9 @@ export const selectArtisanProfile = (state: { auth: AuthState }) =>
   state.auth.artisanProfile;
 export const selectAuthUserRole = (state: { auth: AuthState }) =>
   state.auth.user?.role;
+export const selectAppMode = (state: { auth: AuthState }) => state.auth.appMode;
+export const selectIsArtisan = (state: { auth: AuthState }) =>
+  state.auth.user?.role === 'artisan';
 export const selectIsArtisanVerified = (state: { auth: AuthState }) => {
   const user = state.auth.user;
   if (!user || user.role !== 'artisan') {

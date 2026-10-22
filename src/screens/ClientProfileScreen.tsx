@@ -39,8 +39,10 @@ import { useAuthNavigation } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   loadArtisanProfile,
+  selectAppMode,
   selectArtisanProfile,
   selectAuthUser,
+  setAppMode,
   logoutUser,
 } from '../store/slices/authSlice';
 import { appColors } from '../theme/clientApp';
@@ -58,7 +60,9 @@ export function ClientProfileScreen() {
   const navigation = useAuthNavigation();
   const user = useAppSelector(selectAuthUser);
   const artisanProfile = useAppSelector(selectArtisanProfile);
+  const appMode = useAppSelector(selectAppMode);
   const insets = useSafeAreaInsets();
+  const isArtisan = user?.role === 'artisan';
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSheetVisible, setSheetVisible] = useState(false);
@@ -74,8 +78,27 @@ export function ClientProfileScreen() {
       dispatch(loadArtisanProfile());
     }
   }, [dispatch, user?.role, artisanProfile]);
-  const [isSwitchingRole, setSwitchingRole] = useState(user?.role === 'artisan');
   const [pushEnabled, setPushEnabled] = useState(false);
+
+  // Label and behaviour of the app-mode row depend on whether the signed-in
+  // account is an artisan and, if so, which experience is currently active.
+  const appModeLabel = !isArtisan
+    ? 'Become an Artisan'
+    : appMode === 'artisan'
+      ? 'Switch to Client Mode'
+      : 'Switch to Artisan Mode';
+
+  const handleAppModePress = () => {
+    if (!isArtisan) {
+      Alert.alert(
+        'Coming soon',
+        'Becoming an artisan is not yet available. Please check back later.',
+      );
+      return;
+    }
+
+    dispatch(setAppMode(appMode === 'artisan' ? 'client' : 'artisan'));
+  };
 
   const fullName = [user?.firstName, user?.lastName]
     .filter(part => part && part.trim().length > 0)
@@ -165,21 +188,11 @@ export function ClientProfileScreen() {
         </View>
 
         <View style={styles.sections}>
-          <Section title="Role management">
+          <Section title="App mode">
             <ProfileRow
               Icon={ProfileIcon}
-              control={
-                <Switch
-                  onValueChange={setSwitchingRole}
-                  thumbColor={appColors.white}
-                  trackColor={{
-                    false: appColors.chipInactive,
-                    true: appColors.primary,
-                  }}
-                  value={isSwitchingRole}
-                />
-              }
-              title="Switch to Client"
+              onPress={handleAppModePress}
+              title={appModeLabel}
             />
           </Section>
 
