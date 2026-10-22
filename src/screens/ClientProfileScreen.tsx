@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BookingsHeader } from '../components/bookings/BookingsHeader';
 import { AvatarPickerSheet } from '../components/profile/AvatarPickerSheet';
+import { ModeSwitchedSheet } from '../components/profile/ModeSwitchedSheet';
 import {
   AvatarPlaceholderIcon,
   BellIcon,
@@ -44,6 +45,7 @@ import {
   selectAuthUser,
   setAppMode,
   logoutUser,
+  type AppMode,
 } from '../store/slices/authSlice';
 import { appColors } from '../theme/clientApp';
 
@@ -66,6 +68,7 @@ export function ClientProfileScreen() {
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSheetVisible, setSheetVisible] = useState(false);
+  const [switchedTo, setSwitchedTo] = useState<AppMode | null>(null);
   // A locally picked photo overrides the saved one; otherwise show the saved
   // profile picture from the artisan's portfolio.
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
@@ -80,7 +83,7 @@ export function ClientProfileScreen() {
   }, [dispatch, user?.role, artisanProfile]);
   const [pushEnabled, setPushEnabled] = useState(false);
 
-  // Label and behaviour of the app-mode row depend on whether the signed-in
+  // Label and behaviour of the mode button depend on whether the signed-in
   // account is an artisan and, if so, which experience is currently active.
   const appModeLabel = !isArtisan
     ? 'Become an Artisan'
@@ -89,6 +92,10 @@ export function ClientProfileScreen() {
       : 'Switch to Artisan Mode';
 
   const handleAppModePress = () => {
+    if (switchedTo) {
+      return;
+    }
+
     if (!isArtisan) {
       Alert.alert(
         'Coming soon',
@@ -97,8 +104,22 @@ export function ClientProfileScreen() {
       return;
     }
 
-    dispatch(setAppMode(appMode === 'artisan' ? 'client' : 'artisan'));
+    setSwitchedTo(appMode === 'artisan' ? 'client' : 'artisan');
   };
+
+  // Keep the success sheet up briefly, then flip the experience so the new
+  // tab navigator mounts on the home page.
+  useEffect(() => {
+    if (!switchedTo) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      dispatch(setAppMode(switchedTo));
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [dispatch, switchedTo]);
 
   const fullName = [user?.firstName, user?.lastName]
     .filter(part => part && part.trim().length > 0)
@@ -188,13 +209,18 @@ export function ClientProfileScreen() {
         </View>
 
         <View style={styles.sections}>
-          <Section title="App mode">
-            <ProfileRow
-              Icon={ProfileIcon}
-              onPress={handleAppModePress}
-              title={appModeLabel}
-            />
-          </Section>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: switchedTo !== null }}
+            disabled={switchedTo !== null}
+            onPress={handleAppModePress}
+            style={({ pressed }) => [
+              styles.modeButton,
+              pressed && styles.modeButtonPressed,
+            ]}
+          >
+            <Text style={styles.modeButtonLabel}>{appModeLabel}</Text>
+          </Pressable>
 
           <Section title="Account">
             <ProfileRow
@@ -203,12 +229,14 @@ export function ClientProfileScreen() {
               subtitle="Update your personal details"
               title="Personal details"
             />
-            <ProfileRow
-              Icon={BriefcaseIcon}
-              onPress={() => navigation.navigate('ArtisanPortfolio')}
-              subtitle="Update your work profile"
-              title="Job Profile"
-            />
+            {appMode === 'artisan' ? (
+              <ProfileRow
+                Icon={BriefcaseIcon}
+                onPress={() => navigation.navigate('ArtisanPortfolio')}
+                subtitle="Update your work profile"
+                title="Job Profile"
+              />
+            ) : null}
             <ProfileRow
               Icon={LockIcon}
               onPress={() => navigation.navigate('ChangePassword')}
@@ -262,6 +290,8 @@ export function ClientProfileScreen() {
           </Section>
         </View>
       </ScrollView>
+
+      <ModeSwitchedSheet mode={switchedTo} visible={switchedTo !== null} />
 
       <AvatarPickerSheet
         hasPhoto={displayedAvatar !== null}
@@ -383,6 +413,23 @@ const styles = StyleSheet.create({
   sections: {
     paddingHorizontal: 24,
     paddingTop: 28,
+  },
+  modeButton: {
+    alignItems: 'center',
+    backgroundColor: appColors.primary,
+    borderRadius: 8,
+    height: 56,
+    justifyContent: 'center',
+    marginBottom: 28,
+  },
+  modeButtonPressed: {
+    opacity: 0.85,
+  },
+  modeButtonLabel: {
+    color: appColors.white,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 20,
   },
   section: {
     marginBottom: 28,
