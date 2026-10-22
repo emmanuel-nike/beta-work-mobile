@@ -46,6 +46,10 @@ type AuthState = {
   user: AuthUser | null;
   /** The experience currently active for the signed-in user. */
   appMode: AppMode;
+  /** Next mode after the success sheet; null when no switch is in flight. */
+  pendingAppMode: AppMode | null;
+  /** Bumped on each completed switch so the tab navigator remounts on home. */
+  appModeEpoch: number;
   /** The authenticated artisan's full saved portfolio, once loaded. */
   artisanProfile: ArtisanProfileData | null;
   status: 'idle' | 'loading' | 'failed';
@@ -67,6 +71,8 @@ const initialState: AuthState = {
   tokenType: null,
   user: null,
   appMode: 'client',
+  pendingAppMode: null,
+  appModeEpoch: 0,
   artisanProfile: null,
   status: 'idle',
   error: null,
@@ -251,6 +257,26 @@ const authSlice = createSlice({
           ? 'client'
           : action.payload;
     },
+    requestAppModeSwitch(state, action: PayloadAction<AppMode>) {
+      if (state.pendingAppMode) {
+        return;
+      }
+      state.pendingAppMode =
+        action.payload === 'artisan' && state.user?.role !== 'artisan'
+          ? 'client'
+          : action.payload;
+    },
+    applyPendingAppMode(state) {
+      if (!state.pendingAppMode) {
+        return;
+      }
+      state.appMode =
+        state.pendingAppMode === 'artisan' && state.user?.role !== 'artisan'
+          ? 'client'
+          : state.pendingAppMode;
+      state.pendingAppMode = null;
+      state.appModeEpoch += 1;
+    },
     signOut() {
       return { ...initialState, isBootstrapping: false };
     },
@@ -338,8 +364,14 @@ const authSlice = createSlice({
   },
 });
 
-export const { setSession, setAppMode, signOut, clearAuthError } =
-  authSlice.actions;
+export const {
+  setSession,
+  setAppMode,
+  requestAppModeSwitch,
+  applyPendingAppMode,
+  signOut,
+  clearAuthError,
+} = authSlice.actions;
 export const authReducer = authSlice.reducer;
 export { sessionFromTokenResponse };
 
@@ -373,6 +405,10 @@ export const selectArtisanProfile = (state: { auth: AuthState }) =>
 export const selectAuthUserRole = (state: { auth: AuthState }) =>
   state.auth.user?.role;
 export const selectAppMode = (state: { auth: AuthState }) => state.auth.appMode;
+export const selectPendingAppMode = (state: { auth: AuthState }) =>
+  state.auth.pendingAppMode;
+export const selectAppModeEpoch = (state: { auth: AuthState }) =>
+  state.auth.appModeEpoch;
 export const selectIsArtisan = (state: { auth: AuthState }) =>
   state.auth.user?.role === 'artisan';
 export const selectIsArtisanVerified = (state: { auth: AuthState }) => {

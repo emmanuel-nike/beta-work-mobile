@@ -20,7 +20,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BookingsHeader } from '../components/bookings/BookingsHeader';
 import { AvatarPickerSheet } from '../components/profile/AvatarPickerSheet';
-import { ModeSwitchedSheet } from '../components/profile/ModeSwitchedSheet';
 import {
   AvatarPlaceholderIcon,
   BellIcon,
@@ -43,9 +42,9 @@ import {
   selectAppMode,
   selectArtisanProfile,
   selectAuthUser,
-  setAppMode,
+  selectPendingAppMode,
+  requestAppModeSwitch,
   logoutUser,
-  type AppMode,
 } from '../store/slices/authSlice';
 import { appColors } from '../theme/clientApp';
 
@@ -63,12 +62,12 @@ export function ClientProfileScreen() {
   const user = useAppSelector(selectAuthUser);
   const artisanProfile = useAppSelector(selectArtisanProfile);
   const appMode = useAppSelector(selectAppMode);
+  const pendingAppMode = useAppSelector(selectPendingAppMode);
   const insets = useSafeAreaInsets();
   const isArtisan = user?.role === 'artisan';
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSheetVisible, setSheetVisible] = useState(false);
-  const [switchedTo, setSwitchedTo] = useState<AppMode | null>(null);
   // A locally picked photo overrides the saved one; otherwise show the saved
   // profile picture from the artisan's portfolio.
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
@@ -92,10 +91,6 @@ export function ClientProfileScreen() {
       : 'Switch to Artisan Mode';
 
   const handleAppModePress = () => {
-    if (switchedTo) {
-      return;
-    }
-
     if (!isArtisan) {
       Alert.alert(
         'Coming soon',
@@ -104,22 +99,8 @@ export function ClientProfileScreen() {
       return;
     }
 
-    setSwitchedTo(appMode === 'artisan' ? 'client' : 'artisan');
+    dispatch(requestAppModeSwitch(appMode === 'artisan' ? 'client' : 'artisan'));
   };
-
-  // Keep the success sheet up briefly, then flip the experience so the new
-  // tab navigator mounts on the home page.
-  useEffect(() => {
-    if (!switchedTo) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      dispatch(setAppMode(switchedTo));
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [dispatch, switchedTo]);
 
   const fullName = [user?.firstName, user?.lastName]
     .filter(part => part && part.trim().length > 0)
@@ -211,8 +192,8 @@ export function ClientProfileScreen() {
         <View style={styles.sections}>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ disabled: switchedTo !== null }}
-            disabled={switchedTo !== null}
+            accessibilityState={{ disabled: pendingAppMode !== null }}
+            disabled={pendingAppMode !== null}
             onPress={handleAppModePress}
             style={({ pressed }) => [
               styles.modeButton,
@@ -290,8 +271,6 @@ export function ClientProfileScreen() {
           </Section>
         </View>
       </ScrollView>
-
-      <ModeSwitchedSheet mode={switchedTo} visible={switchedTo !== null} />
 
       <AvatarPickerSheet
         hasPhoto={displayedAvatar !== null}
