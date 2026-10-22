@@ -11,16 +11,46 @@ export type ValidateUserPayload = Readonly<{
   address?: string;
 }>;
 
+// NOTE: OTP verification moved from phone number to email. The phone-based
+// response shapes are kept (commented out) for reference during the migration.
+// export type SendOtpResponse = Readonly<{
+//   message: string;
+//   phoneNumber: string;
+//   otp: string;
+// }>;
+//
+// export type VerifyOtpResponse = Readonly<{
+//   message: string;
+//   phoneNumber: string;
+//   verified: boolean;
+// }>;
+
 export type SendOtpResponse = Readonly<{
   message: string;
-  phoneNumber: string;
-  otp: string;
+  email: string;
+  /** Present only in non-production backends to ease local testing. */
+  otp?: string;
 }>;
 
 export type VerifyOtpResponse = Readonly<{
   message: string;
-  phoneNumber: string;
+  email: string;
   verified: boolean;
+}>;
+
+export type ForgotPasswordResponse = Readonly<{
+  message: string;
+  /** Present only in non-production backends when the email matches a user. */
+  otp?: string;
+}>;
+
+export type VerifyPasswordOtpResponse = Readonly<{
+  message: string;
+  verified: boolean;
+}>;
+
+export type ResetPasswordResponse = Readonly<{
+  message: string;
 }>;
 
 export type ArtisanVerificationStatus = 'pending' | 'approved' | 'rejected';
@@ -85,20 +115,81 @@ export async function validateUser(payload: ValidateUserPayload) {
   );
 }
 
-export async function sendOtp(phoneNumber: string) {
+// --- Phone-number OTP (replaced by email OTP; kept for reference) ----------
+// export async function sendOtp(phoneNumber: string) {
+//   return apiRequest<SendOtpResponse>('/auth/otp/send', {
+//     method: 'POST',
+//     body: { phoneNumber: toE164Phone(phoneNumber) },
+//   });
+// }
+//
+// export async function verifyOtp(phoneNumber: string, otp: string) {
+//   return apiRequest<VerifyOtpResponse>('/auth/otp/verify', {
+//     method: 'POST',
+//     body: {
+//       phoneNumber: toE164Phone(phoneNumber),
+//       otp,
+//     },
+//   });
+// }
+// ---------------------------------------------------------------------------
+
+/**
+ * Send a verification OTP to an email address (signup + artisan onboarding).
+ */
+export async function sendOtp(email: string) {
   return apiRequest<SendOtpResponse>('/auth/otp/send', {
     method: 'POST',
-    body: { phoneNumber: toE164Phone(phoneNumber) },
+    body: { email: email.trim() },
   });
 }
 
-export async function verifyOtp(phoneNumber: string, otp: string) {
+/**
+ * Verify an email OTP issued by {@link sendOtp}.
+ */
+export async function verifyOtp(email: string, otp: string) {
   return apiRequest<VerifyOtpResponse>('/auth/otp/verify', {
     method: 'POST',
     body: {
-      phoneNumber: toE164Phone(phoneNumber),
+      email: email.trim(),
       otp,
     },
+  });
+}
+
+/**
+ * Begin a password reset by emailing a one-time code to the given address.
+ * The backend always responds success (it does not reveal whether the email
+ * belongs to an account); a dev backend echoes the code back in `otp`.
+ */
+export async function forgotPassword(email: string) {
+  return apiRequest<ForgotPasswordResponse>('/auth/password/forgot', {
+    method: 'POST',
+    body: { email: email.trim() },
+  });
+}
+
+/**
+ * Check a password-reset code without consuming it.
+ */
+export async function verifyPasswordOtp(email: string, otp: string) {
+  return apiRequest<VerifyPasswordOtpResponse>('/auth/password/verify-otp', {
+    method: 'POST',
+    body: { email: email.trim(), otp },
+  });
+}
+
+/**
+ * Complete a password reset using the emailed code and a new password.
+ */
+export async function resetPassword(
+  email: string,
+  otp: string,
+  password: string,
+) {
+  return apiRequest<ResetPasswordResponse>('/auth/password/reset', {
+    method: 'POST',
+    body: { email: email.trim(), otp, password },
   });
 }
 

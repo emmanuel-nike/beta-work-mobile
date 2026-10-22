@@ -21,6 +21,12 @@ import OtpArtwork from '../../assets/images/otp.png';
 import PasswordIcon from '../../assets/images/password.svg';
 import ResetEmailArtwork from '../../assets/images/reset-email.png';
 import SuccessArtwork from '../../assets/images/signup-success.png';
+import {
+  forgotPassword,
+  resetPassword,
+  verifyPasswordOtp,
+} from '../api/auth';
+import { ApiError } from '../api/client';
 import { ActionButton } from '../components/ActionButton';
 import { FormField } from '../components/FormField';
 import { useOtpResendCountdown } from '../hooks/useOtpResendCountdown';
@@ -56,7 +62,10 @@ const isValidEmail = (value: string) => {
 export function SignInFlow() {
   const navigation = usePreAuthNavigation();
   const [step, setStep] = useState<SignInStep>('login');
-  const [resetPhone, setResetPhone] = useState('0801 234 5678');
+  // Email the reset code was sent to, and the verified code, carried across
+  // the reset steps so the final request can complete the password change.
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -85,19 +94,26 @@ export function SignInFlow() {
       {step === 'resetEmail' ? (
         <ResetEmailScreen
           onBack={() => setStep('login')}
-          onContinue={() => setStep('resetVerify')}
+          onContinue={email => {
+            setResetEmail(email);
+            setStep('resetVerify');
+          }}
         />
       ) : null}
       {step === 'resetVerify' ? (
         <ResetVerifyScreen
+          email={resetEmail}
           onBack={() => setStep('resetEmail')}
-          onVerified={() => setStep('resetPassword')}
-          phoneNumber={resetPhone}
-          setPhoneNumber={setResetPhone}
+          onVerified={otp => {
+            setResetOtp(otp);
+            setStep('resetPassword');
+          }}
         />
       ) : null}
       {step === 'resetPassword' ? (
         <CreatePasswordScreen
+          email={resetEmail}
+          otp={resetOtp}
           onSaved={() => setStep('resetSuccess')}
         />
       ) : null}
@@ -208,16 +224,35 @@ function LoginScreen({
 function ResetEmailScreen({
   onBack,
   onContinue,
-}: Readonly<{ onBack: () => void; onContinue: () => void }>) {
+}: Readonly<{ onBack: () => void; onContinue: (email: string) => void }>) {
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const submit = () => {
-    if (!isValidEmail(email)) {
+  const submit = async () => {
+    if (isSubmitting) {
+      return;
+    }
+    const trimmed = email.trim();
+    if (!isValidEmail(trimmed)) {
       setError('Enter a valid email address and try again');
       return;
     }
-    onContinue();
+
+    setIsSubmitting(true);
+    setError(undefined);
+    try {
+      await forgotPassword(trimmed);
+      onContinue(trimmed);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to send a reset code. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -269,7 +304,9 @@ function ResetEmailScreen({
             textContentType="emailAddress"
             value={email}
           />
-          <ActionButton onPress={submit}>Send reset code</ActionButton>
+          <ActionButton disabled={isSubmitting} onPress={submit}>
+            {isSubmitting ? 'Sending...' : 'Send reset code'}
+          </ActionButton>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -279,25 +316,24 @@ function ResetEmailScreen({
 const RESET_OTP_EXPIRY_SECONDS = 300;
 
 function ResetVerifyScreen({
-  phoneNumber,
-  setPhoneNumber,
+  email,
   onBack,
   onVerified,
 }: Readonly<{
-  phoneNumber: string;
-  setPhoneNumber: (value: string) => void;
+  email: string;
   onBack: () => void;
-  onVerified: () => void;
+  onVerified: (otp: string) => void;
 }>) {
   const [code, setCode] = useState('');
   const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const { canResend, formattedTime, resetCountdown } = useOtpResendCountdown(
     RESET_OTP_EXPIRY_SECONDS,
   );
 
-  const resend = () => {
+  const resend = async () => {
     if (!canResend || isSubmitting) {
       return;
     }
@@ -305,18 +341,44 @@ function ResetVerifyScreen({
     setIsSubmitting(true);
     setCode('');
     setHasError(false);
-    inputRef.current?.focus();
-    resetCountdown();
-    setIsSubmitting(false);
+    setErrorMessage(undefined);
+    try {
+      await forgotPassword(email);
+      resetCountdown();
+      inputRef.current?.focus();
+    } catch (err) {
+      setErrorMessage(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to resend the code. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const verify = () => {
+  const verify = async () => {
     Keyboard.dismiss();
-    if (code === '123456') {
-      onVerified();
+    if (code.length !== 6 || isSubmitting) {
       return;
     }
-    setHasError(true);
+
+    setIsSubmitting(true);
+    setHasError(false);
+    setErrorMessage(undefined);
+    try {
+      await verifyPasswordOtp(email, code);
+      onVerified(code);
+    } catch (err) {
+      setHasError(true);
+      setErrorMessage(
+        err instanceof ApiError
+          ? err.message
+          : 'Verification code is incorrect. Please try again',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -341,18 +403,18 @@ function ResetVerifyScreen({
           </View>
 
           <View style={styles.heading}>
-            <Text style={styles.verifyTitle}>Verify your phone number</Text>
+            <Text style={styles.verifyTitle}>Verify your email</Text>
             <Text style={styles.body}>
-              We have sent a 6-digit verification code by text.
+              We have sent a 6-digit verification code by email.
             </Text>
           </View>
 
           <View style={styles.phoneRow}>
-            <Text style={styles.phoneNumber}>{phoneNumber}</Text>
+            <Text style={styles.phoneNumber}>{email}</Text>
             <Pressable
               accessibilityRole="button"
               hitSlop={8}
-              onPress={() => setPhoneNumber(phoneNumber)}
+              onPress={onBack}
               style={styles.editButton}>
               <Text style={styles.editLabel}>Edit</Text>
             </Pressable>
@@ -400,14 +462,15 @@ function ResetVerifyScreen({
             />
           </Pressable>
 
-          {hasError ? (
+          {hasError || errorMessage ? (
             <Text style={styles.otpError}>
-              Verification code is incorrect. Please try again
+              {errorMessage ??
+                'Verification code is incorrect. Please try again'}
             </Text>
           ) : (
             <Text style={styles.otpHint}>
-              Enter the code sent to your phone number. If you don’t see it
-              immediately, please wait a few seconds or tap resend.
+              Enter the code sent to your email. If you don’t see it
+              immediately, please check your spam folder or tap resend.
             </Text>
           )}
 
@@ -421,14 +484,14 @@ function ResetVerifyScreen({
           </Text>
 
           <ActionButton
-            disabled={code.length !== 6}
+            disabled={code.length !== 6 || isSubmitting}
             onPress={verify}
             style={styles.verifyButton}>
-            Verify
+            {isSubmitting ? 'Verifying...' : 'Verify'}
           </ActionButton>
 
           <Text style={styles.incorrectNumber}>
-            Incorrect phone number?{' '}
+            Wrong email address?{' '}
             <Text onPress={onBack} style={styles.link}>
               Go back
             </Text>
@@ -440,13 +503,19 @@ function ResetVerifyScreen({
 }
 
 function CreatePasswordScreen({
+  email,
+  otp,
   onSaved,
-}: Readonly<{ onSaved: () => void }>) {
+}: Readonly<{ email: string; otp: string; onSaved: () => void }>) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [confirmError, setConfirmError] = useState<string>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const submit = () => {
+  const submit = async () => {
+    if (isSubmitting) {
+      return;
+    }
     if (password.length < 8) {
       setConfirmError(
         'Your new password should be at least 8 characters with a mix of numbers and letters.',
@@ -457,7 +526,21 @@ function CreatePasswordScreen({
       setConfirmError("Password doesn’t match, make sure both passwords are the same.");
       return;
     }
-    onSaved();
+
+    setIsSubmitting(true);
+    setConfirmError(undefined);
+    try {
+      await resetPassword(email, otp, password);
+      onSaved();
+    } catch (err) {
+      setConfirmError(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to reset your password. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -508,8 +591,11 @@ function CreatePasswordScreen({
             textContentType="newPassword"
             value={confirmPassword}
           />
-          <ActionButton onPress={submit} style={styles.saveButton}>
-            Save password
+          <ActionButton
+            disabled={isSubmitting}
+            onPress={submit}
+            style={styles.saveButton}>
+            {isSubmitting ? 'Saving...' : 'Save password'}
           </ActionButton>
         </View>
       </ScrollView>

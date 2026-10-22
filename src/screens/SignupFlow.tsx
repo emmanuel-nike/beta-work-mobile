@@ -31,7 +31,7 @@ import {
   verifyOtp,
 } from '../api/auth';
 import { ApiError } from '../api/client';
-import { splitFullName, toE164Phone } from '../api/phone';
+import { splitFullName } from '../api/phone';
 import { ActionButton } from '../components/ActionButton';
 import { FormField } from '../components/FormField';
 import { useOtpResendCountdown } from '../hooks/useOtpResendCountdown';
@@ -171,8 +171,8 @@ function SignupDetails({
     try {
       const payload = buildValidatePayloadFromForm(form);
       await validateUser(payload);
-      const otpResponse = await sendOtp(form.phone);
-      onContinue(form, otpResponse.otp);
+      const otpResponse = await sendOtp(form.email);
+      onContinue(form, otpResponse.otp ?? '');
     } catch (error) {
       setSubmitError(
         error instanceof ApiError
@@ -307,7 +307,6 @@ function VerificationScreen({
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const displayPhone = toE164Phone(form.phone);
   const { canResend, formattedTime, resetCountdown } =
     useOtpResendCountdown(OTP_EXPIRY_SECONDS);
 
@@ -332,8 +331,8 @@ function VerificationScreen({
     setIsSubmitting(true);
     setSubmitError('');
     try {
-      const response = await sendOtp(form.phone);
-      updateCode(response.otp);
+      const response = await sendOtp(form.email);
+      updateCode(response.otp ?? '');
       resetCountdown();
     } catch (error) {
       setSubmitError(
@@ -357,7 +356,7 @@ function VerificationScreen({
     setHasError(false);
 
     try {
-      await verifyOtp(form.phone, code);
+      await verifyOtp(form.email, code);
       const { firstName, lastName } = splitFullName(form.fullName);
       const response = await registerUser({
         firstName,
@@ -374,7 +373,7 @@ function VerificationScreen({
       setSubmitError(
         error instanceof ApiError
           ? error.message
-          : 'Unable to verify phone number. Please try again.',
+          : 'Unable to verify your email. Please try again.',
       );
     } finally {
       setIsSubmitting(false);
@@ -403,10 +402,10 @@ function VerificationScreen({
           </View>
 
           <View style={styles.verificationHeading}>
-            <Text style={styles.verificationTitle}>Verify your phone number</Text>
+            <Text style={styles.verificationTitle}>Verify your email</Text>
             <Text style={styles.body}>
               Enter the code sent to{' '}
-              <Text style={styles.phoneEmphasis}>{displayPhone}</Text>
+              <Text style={styles.phoneEmphasis}>{form.email}</Text>
             </Text>
           </View>
 
@@ -465,7 +464,7 @@ function VerificationScreen({
           </ActionButton>
 
           <Text style={styles.incorrectNumber}>
-            Incorrect phone number?{' '}
+            Wrong email address?{' '}
             <Text onPress={onBack} style={styles.link}>
               Go back
             </Text>
