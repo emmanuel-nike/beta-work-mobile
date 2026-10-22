@@ -35,7 +35,6 @@ import {
   verifyOtp,
 } from '../api/auth';
 import { ApiError } from '../api/client';
-import { toE164Phone } from '../api/phone';
 import { ActionButton } from '../components/ActionButton';
 import { FormField } from '../components/FormField';
 import { ProgressBar } from '../components/ProgressBar';
@@ -133,7 +132,10 @@ export function ArtisanFlow({
   const [splashIndex, setSplashIndex] = useState(0);
   const [hasFinishedSplash, setHasFinishedSplash] = useState(false);
   const [step, setStep] = useState<SignupStep>('details');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  // Phone is still captured during onboarding for the eventual registration
+  // call, but the OTP itself is now verified by email.
+  const [, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [otp, setOtp] = useState('');
 
@@ -191,8 +193,9 @@ export function ArtisanFlow({
       <StatusBar backgroundColor={colors.background} barStyle="dark-content" />
       {step === 'details' ? (
         <ArtisanDetails
-          onContinue={(phone, name, nextOtp) => {
+          onContinue={(phone, nextEmail, name, nextOtp) => {
             setPhoneNumber(phone);
+            setEmail(nextEmail);
             setFullName(name);
             setOtp(nextOtp);
             setStep('verification');
@@ -202,11 +205,11 @@ export function ArtisanFlow({
       ) : null}
       {step === 'verification' ? (
         <VerificationStep
+          email={email}
           initialOtp={otp}
           onBack={() => setStep('details')}
           onOtpChange={setOtp}
           onVerified={() => setStep('identity')}
-          phoneNumber={phoneNumber}
         />
       ) : null}
       {step === 'identity' ? (
@@ -244,7 +247,12 @@ function ArtisanDetails({
   onContinue,
   onSignIn,
 }: Readonly<{
-  onContinue: (phone: string, fullName: string, otp: string) => void;
+  onContinue: (
+    phone: string,
+    email: string,
+    fullName: string,
+    otp: string,
+  ) => void;
   onSignIn: () => void;
 }>) {
   const [fullName, setFullName] = useState('');
@@ -280,8 +288,8 @@ function ArtisanDetails({
           address,
         }),
       );
-      const otpResponse = await sendOtp(phone);
-      onContinue(phone, fullName, otpResponse.otp);
+      const otpResponse = await sendOtp(email);
+      onContinue(phone, email, fullName, otpResponse.otp ?? '');
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -390,24 +398,23 @@ function ArtisanDetails({
 const OTP_EXPIRY_SECONDS = 600;
 
 function VerificationStep({
+  email,
   initialOtp,
   onBack,
   onOtpChange,
   onVerified,
-  phoneNumber,
 }: Readonly<{
+  email: string;
   initialOtp: string;
   onBack: () => void;
   onOtpChange: (otp: string) => void;
   onVerified: () => void;
-  phoneNumber: string;
 }>) {
   const [code, setCode] = useState(initialOtp.replace(/\D/g, '').slice(0, 6));
   const [hasError, setHasError] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const displayPhone = toE164Phone(phoneNumber);
   const { canResend, formattedTime, resetCountdown } =
     useOtpResendCountdown(OTP_EXPIRY_SECONDS);
 
@@ -431,8 +438,8 @@ function VerificationStep({
     setIsSubmitting(true);
     setSubmitError('');
     try {
-      const response = await sendOtp(phoneNumber);
-      updateCode(response.otp);
+      const response = await sendOtp(email);
+      updateCode(response.otp ?? '');
       resetCountdown();
     } catch (err) {
       setSubmitError(
@@ -456,7 +463,7 @@ function VerificationStep({
     setSubmitError('');
 
     try {
-      await verifyOtp(phoneNumber, code);
+      await verifyOtp(email, code);
       onVerified();
     } catch (err) {
       setHasError(true);
@@ -482,11 +489,11 @@ function VerificationStep({
         <Pressable onPress={Keyboard.dismiss} style={styles.verificationInner}>
           <TopRow onBack={onBack} step={2} />
           <Heading
-            title="Verify your phone number"
-            body="We have sent a 6-digit verification code by text."
+            title="Verify your email"
+            body="We have sent a 6-digit verification code by email."
           />
           <View style={styles.phoneRow}>
-            <Text style={styles.phoneNumber}>{displayPhone}</Text>
+            <Text style={styles.phoneNumber}>{email}</Text>
             <Pressable accessibilityRole="button" onPress={onBack}>
               <Text style={styles.link}>Edit</Text>
             </Pressable>
@@ -523,8 +530,8 @@ function VerificationStep({
             />
           </Pressable>
           <Text style={styles.otpHint}>
-            Enter the code sent to your phone number. If you don’t see it
-            immediately, please wait a few seconds or tap resend.
+            Enter the code sent to your email. If you don’t see it immediately,
+            please check your spam folder or tap resend.
           </Text>
           <Text style={styles.expiry}>
             This code will expire in {formattedTime}{' '}
@@ -549,7 +556,7 @@ function VerificationStep({
             {isSubmitting ? 'Verifying...' : 'Verify'}
           </ActionButton>
           <Text style={styles.bottomLink}>
-            Incorrect phone number?{' '}
+            Wrong email address?{' '}
             <Text onPress={onBack} style={styles.link}>
               Go back
             </Text>
