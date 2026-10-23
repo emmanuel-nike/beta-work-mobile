@@ -10,6 +10,7 @@ export { CheckCircleIcon } from './CheckCircleIcon';
 export { CheckIcon } from './CheckIcon';
 export { ChevronDownIcon } from './ChevronDownIcon';
 export { ChevronRightIcon } from './ChevronRightIcon';
+export { ClockIcon } from './ClockIcon';
 export { CloseIcon } from './CloseIcon';
 export { CurrentLocationIcon } from './CurrentLocationIcon';
 export { DocumentIcon } from './DocumentIcon';

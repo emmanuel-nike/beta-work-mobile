@@ -4,6 +4,9 @@ import { AllArtisansScreen } from '../screens/artisans/AllArtisansScreen';
 import { AllServicesScreen } from '../screens/artisans/AllServicesScreen';
 import { ServiceArtisansScreen } from '../screens/artisans/ServiceArtisansScreen';
 import { ArtisanProfileScreen } from '../screens/artisans/ArtisanProfileScreen';
+import { BookServiceScreen } from '../screens/bookings/BookServiceScreen';
+import { ReviewBookingScreen } from '../screens/bookings/ReviewBookingScreen';
+import { BookingRequestedScreen } from '../screens/bookings/BookingRequestedScreen';
 import { ArtisanJobDetailScreen } from '../screens/artisan/ArtisanJobDetailScreen';
 import { ArtisanPortfolioScreen } from '../screens/artisan/ArtisanPortfolioScreen';
 import { ChangePasswordScreen } from '../screens/profile/ChangePasswordScreen';
@@ -68,6 +71,21 @@ export function AuthNavigator() {
       <Stack.Screen
         component={ArtisanProfileScreen}
         name="ArtisanProfile"
+        options={{ contentStyle: { backgroundColor: '#F4E9DA' } }}
+      />
+      <Stack.Screen
+        component={BookServiceScreen}
+        name="BookService"
+        options={{ contentStyle: { backgroundColor: '#F7F1E6' } }}
+      />
+      <Stack.Screen
+        component={ReviewBookingScreen}
+        name="ReviewBooking"
+        options={{ contentStyle: { backgroundColor: '#F7F1E6' } }}
+      />
+      <Stack.Screen
+        component={BookingRequestedScreen}
+        name="BookingRequested"
         options={{ contentStyle: { backgroundColor: '#F4E9DA' } }}
       />
       <Stack.Screen

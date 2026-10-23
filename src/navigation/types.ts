@@ -2,6 +2,8 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs'
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack'
 import { useNavigation, type NavigatorScreenParams } from '@react-navigation/native'
 
+import type { BookingDraft } from '../data/bookingDraft'
+
 export type PreAuthStackParamList = {
   Onboarding: undefined
   Signup: undefined
@@ -45,6 +47,9 @@ export type AuthStackParamList = {
   AllServices: undefined
   ServiceArtisans: { serviceId: string }
   ArtisanProfile: { artisanId: string }
+  BookService: { artisanId: string }
+  ReviewBooking: { artisanId: string; draft: BookingDraft }
+  BookingRequested: { artisanId: string; draft: BookingDraft }
   EditProfile: undefined
   ChangePassword: undefined
   ArtisanJobDetail: { jobId: string }

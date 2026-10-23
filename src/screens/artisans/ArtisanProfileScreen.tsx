@@ -239,6 +239,11 @@ export function ArtisanProfileScreen({
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable
           accessibilityRole="button"
+          onPress={() =>
+            navigation.navigate('BookService', {
+              artisanId: route.params.artisanId,
+            })
+          }
           style={({ pressed }) => [styles.book, pressed && styles.pressed]}
         >
           <Text style={styles.bookLabel}>Book now</Text>
