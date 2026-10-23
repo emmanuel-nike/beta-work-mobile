@@ -42,6 +42,8 @@ export type AuthStackParamList = {
   RaiseDispute: { bookingId: string }
   LeaveFeedback: { bookingId: string }
   AllArtisans: { title?: string; query?: string } | undefined
+  AllServices: undefined
+  ServiceArtisans: { serviceId: string }
   ArtisanProfile: { artisanId: string }
   EditProfile: undefined
   ChangePassword: undefined

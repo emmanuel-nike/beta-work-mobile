@@ -1,6 +1,8 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { AllArtisansScreen } from '../screens/artisans/AllArtisansScreen';
+import { AllServicesScreen } from '../screens/artisans/AllServicesScreen';
+import { ServiceArtisansScreen } from '../screens/artisans/ServiceArtisansScreen';
 import { ArtisanProfileScreen } from '../screens/artisans/ArtisanProfileScreen';
 import { ArtisanJobDetailScreen } from '../screens/artisan/ArtisanJobDetailScreen';
 import { ArtisanPortfolioScreen } from '../screens/artisan/ArtisanPortfolioScreen';
@@ -51,6 +53,16 @@ export function AuthNavigator() {
       <Stack.Screen
         component={AllArtisansScreen}
         name="AllArtisans"
+        options={{ contentStyle: { backgroundColor: '#F7F1E6' } }}
+      />
+      <Stack.Screen
+        component={AllServicesScreen}
+        name="AllServices"
+        options={{ contentStyle: { backgroundColor: '#F7F1E6' } }}
+      />
+      <Stack.Screen
+        component={ServiceArtisansScreen}
+        name="ServiceArtisans"
         options={{ contentStyle: { backgroundColor: '#F7F1E6' } }}
       />
       <Stack.Screen

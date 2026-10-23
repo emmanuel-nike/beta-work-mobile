@@ -41,7 +41,10 @@ import {
 import { DEFAULT_LOCATION_LABEL, type SavedAddress } from '../data/locations';
 import { useAuthNavigation } from '../navigation/types';
 import { useAppSelector } from '../store/hooks';
-import { selectArtisanProfile, selectAuthUser } from '../store/slices/authSlice';
+import {
+  selectArtisanProfile,
+  selectAuthUser,
+} from '../store/slices/authSlice';
 import { dashboardColors } from '../theme/dashboard';
 
 const LOCKED_PROFILE_TASKS: readonly ArtisanProfileTask[] =
@@ -102,8 +105,7 @@ function UnderReviewDashboard({
 }>) {
   const navigation = useAuthNavigation();
   const fullName =
-    [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() ||
-    'Abigail Anioke';
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || '';
   const phone = maskPhone(user?.phoneNumber) ?? '0810 *** ****';
 
   return (
@@ -313,7 +315,9 @@ function ApprovalChecklist({
         accessibilityRole={onPress ? 'button' : undefined}
         disabled={!onPress}
         onPress={onPress}
-        style={({ pressed }) => pressed && onPress ? styles.pressed : undefined}
+        style={({ pressed }) =>
+          pressed && onPress ? styles.pressed : undefined
+        }
       >
         <DashboardCard style={styles.checklistCard}>
           {tasks.map(task => (

@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -25,6 +27,7 @@ import {
   BellIcon,
   BriefcaseIcon,
   ChevronRightIcon,
+  CloseIcon,
   DocumentIcon,
   LockIcon,
   LogoutIcon,
@@ -42,10 +45,13 @@ import {
   selectAppMode,
   selectArtisanProfile,
   selectAuthUser,
-  setAppMode,
+  selectPendingAppMode,
+  requestAppModeSwitch,
   logoutUser,
 } from '../store/slices/authSlice';
 import { appColors } from '../theme/clientApp';
+
+const SUPPORT_EMAIL = 'support@beta-work.com';
 
 const PICKER_OPTIONS: ImageLibraryOptions = {
   mediaType: 'photo',
@@ -61,11 +67,16 @@ export function ClientProfileScreen() {
   const user = useAppSelector(selectAuthUser);
   const artisanProfile = useAppSelector(selectArtisanProfile);
   const appMode = useAppSelector(selectAppMode);
+  const pendingAppMode = useAppSelector(selectPendingAppMode);
   const insets = useSafeAreaInsets();
   const isArtisan = user?.role === 'artisan';
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSheetVisible, setSheetVisible] = useState(false);
+  const [isBecomeArtisanOpen, setBecomeArtisanOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<'logout' | 'delete' | null>(
+    null,
+  );
   // A locally picked photo overrides the saved one; otherwise show the saved
   // profile picture from the artisan's portfolio.
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
@@ -79,37 +90,45 @@ export function ClientProfileScreen() {
     }
   }, [dispatch, user?.role, artisanProfile]);
   const [pushEnabled, setPushEnabled] = useState(false);
-
-  // Label and behaviour of the app-mode row depend on whether the signed-in
-  // account is an artisan and, if so, which experience is currently active.
-  const appModeLabel = !isArtisan
-    ? 'Become an Artisan'
-    : appMode === 'artisan'
-      ? 'Switch to Client Mode'
-      : 'Switch to Artisan Mode';
-
-  const handleAppModePress = () => {
-    if (!isArtisan) {
-      Alert.alert(
-        'Coming soon',
-        'Becoming an artisan is not yet available. Please check back later.',
-      );
-      return;
-    }
-
-    dispatch(setAppMode(appMode === 'artisan' ? 'client' : 'artisan'));
-  };
-
   const fullName = [user?.firstName, user?.lastName]
     .filter(part => part && part.trim().length > 0)
     .join(' ')
     .trim();
+
+  const artisanModeOn = isArtisan && appMode === 'artisan';
+  const modeHint = !isArtisan
+    ? 'Turn this on to offer your skills and get booked.'
+    : artisanModeOn
+      ? 'You are offering services. Turn this off to browse as a client.'
+      : 'Turn this on to manage jobs and your work profile.';
+
+  const handleArtisanModeChange = (next: boolean) => {
+    if (pendingAppMode) {
+      return;
+    }
+
+    if (!isArtisan) {
+      setBecomeArtisanOpen(true);
+      return;
+    }
+
+    dispatch(requestAppModeSwitch(next ? 'artisan' : 'client'));
+  };
+
+  const handleEmailSupport = () => {
+    const subject = encodeURIComponent('Become an artisan');
+    const body = encodeURIComponent(
+      `Name: ${fullName}\nPhone: ${user?.phoneNumber ?? ''}\n\nI would like to become an artisan on Beta Work.`,
+    );
+    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`);
+  };
 
   const handleLogout = async () => {
     if (isLoggingOut) {
       return;
     }
 
+    setConfirmAction(null);
     setIsLoggingOut(true);
     try {
       await dispatch(logoutUser()).unwrap();
@@ -188,13 +207,23 @@ export function ClientProfileScreen() {
         </View>
 
         <View style={styles.sections}>
-          <Section title="App mode">
-            <ProfileRow
-              Icon={ProfileIcon}
-              onPress={handleAppModePress}
-              title={appModeLabel}
+          <View style={styles.modeCard}>
+            <View style={styles.modeCopy}>
+              <Text style={styles.modeTitle}>Artisan mode</Text>
+              <Text style={styles.modeHint}>{modeHint}</Text>
+            </View>
+            <Switch
+              accessibilityLabel="Artisan mode"
+              disabled={pendingAppMode !== null}
+              onValueChange={handleArtisanModeChange}
+              thumbColor={appColors.white}
+              trackColor={{
+                false: appColors.chipInactive,
+                true: appColors.primary,
+              }}
+              value={artisanModeOn}
             />
-          </Section>
+          </View>
 
           <Section title="Account">
             <ProfileRow
@@ -203,12 +232,14 @@ export function ClientProfileScreen() {
               subtitle="Update your personal details"
               title="Personal details"
             />
-            <ProfileRow
-              Icon={BriefcaseIcon}
-              onPress={() => navigation.navigate('ArtisanPortfolio')}
-              subtitle="Update your work profile"
-              title="Job Profile"
-            />
+            {appMode === 'artisan' ? (
+              <ProfileRow
+                Icon={BriefcaseIcon}
+                onPress={() => navigation.navigate('ArtisanPortfolio')}
+                subtitle="Update your work profile"
+                title="Job Profile"
+              />
+            ) : null}
             <ProfileRow
               Icon={LockIcon}
               onPress={() => navigation.navigate('ChangePassword')}
@@ -255,13 +286,37 @@ export function ClientProfileScreen() {
                 ) : null
               }
               destructive
-              onPress={handleLogout}
+              onPress={() => setConfirmAction('logout')}
               title="Log Out"
             />
-            <ProfileRow Icon={TrashIcon} destructive title="Delete Account" />
+            <ProfileRow
+              Icon={TrashIcon}
+              destructive
+              onPress={() => setConfirmAction('delete')}
+              title="Delete Account"
+            />
           </Section>
         </View>
       </ScrollView>
+
+      <ConfirmActionModal
+        action={confirmAction}
+        confirming={isLoggingOut}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => {
+          if (confirmAction === 'logout') {
+            handleLogout();
+            return;
+          }
+          setConfirmAction(null);
+        }}
+      />
+
+      <BecomeArtisanModal
+        onClose={() => setBecomeArtisanOpen(false)}
+        onEmail={handleEmailSupport}
+        visible={isBecomeArtisanOpen}
+      />
 
       <AvatarPickerSheet
         hasPhoto={displayedAvatar !== null}
@@ -275,6 +330,132 @@ export function ClientProfileScreen() {
         visible={isSheetVisible}
       />
     </View>
+  );
+}
+
+function ConfirmActionModal({
+  action,
+  confirming,
+  onClose,
+  onConfirm,
+}: Readonly<{
+  action: 'logout' | 'delete' | null;
+  confirming: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}>) {
+  const isDelete = action === 'delete';
+
+  return (
+    <Modal
+      animationType="fade"
+      onRequestClose={onClose}
+      transparent
+      visible={action !== null}
+    >
+      <View style={styles.modalRoot}>
+        <Pressable
+          accessibilityLabel="Dismiss"
+          accessibilityRole="button"
+          onPress={confirming ? undefined : onClose}
+          style={styles.modalBackdrop}
+        />
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>
+            {isDelete ? 'Delete account?' : 'Log out?'}
+          </Text>
+          <Text style={styles.modalBody}>
+            {isDelete
+              ? 'This permanently removes your account and cannot be undone.'
+              : 'You will need to sign in again to use Beta Work.'}
+          </Text>
+          <View style={styles.modalActions}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={confirming}
+              onPress={onClose}
+              style={({ pressed }) => [
+                styles.modalSecondary,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.modalSecondaryLabel}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={confirming}
+              onPress={onConfirm}
+              style={({ pressed }) => [
+                styles.modalDanger,
+                (pressed || confirming) && styles.pressed,
+              ]}
+            >
+              {confirming ? (
+                <ActivityIndicator color={appColors.white} size="small" />
+              ) : (
+                <Text style={styles.modalButtonLabel}>
+                  {isDelete ? 'Delete account' : 'Log out'}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function BecomeArtisanModal({
+  visible,
+  onClose,
+  onEmail,
+}: Readonly<{
+  visible: boolean;
+  onClose: () => void;
+  onEmail: () => void;
+}>) {
+  return (
+    <Modal
+      animationType="fade"
+      onRequestClose={onClose}
+      transparent
+      visible={visible}
+    >
+      <View style={styles.modalRoot}>
+        <Pressable
+          accessibilityLabel="Dismiss"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.modalBackdrop}
+        />
+        <View style={styles.modalCard}>
+          <Pressable
+            accessibilityLabel="Close"
+            accessibilityRole="button"
+            hitSlop={12}
+            onPress={onClose}
+            style={styles.modalClose}
+          >
+            <CloseIcon color="#4A3A2C" size={14} />
+          </Pressable>
+          <Text style={styles.modalTitle}>Become an artisan</Text>
+          <Text style={styles.modalBody}>
+            Email {SUPPORT_EMAIL} with your details and our team will set up
+            your artisan account.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onEmail}
+            style={({ pressed }) => [
+              styles.modalButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.modalButtonLabel}>Email support</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -383,6 +564,106 @@ const styles = StyleSheet.create({
   sections: {
     paddingHorizontal: 24,
     paddingTop: 28,
+  },
+  modeCard: {
+    alignItems: 'center',
+    backgroundColor: appColors.field,
+    borderColor: appColors.cardBorder,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 28,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  modeCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  modeTitle: {
+    color: appColors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  modeHint: {
+    color: appColors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  modalRoot: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(24, 16, 8, 0.28)',
+  },
+  modalCard: {
+    backgroundColor: appColors.field,
+    borderRadius: 16,
+    gap: 12,
+    padding: 24,
+    width: '100%',
+  },
+  modalClose: {
+    alignSelf: 'flex-end',
+  },
+  modalTitle: {
+    color: appColors.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 24,
+  },
+  modalBody: {
+    color: appColors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalSecondary: {
+    alignItems: 'center',
+    borderColor: appColors.cardBorder,
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    height: 48,
+    justifyContent: 'center',
+  },
+  modalSecondaryLabel: {
+    color: appColors.textPrimary,
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  modalDanger: {
+    alignItems: 'center',
+    backgroundColor: appColors.danger,
+    borderRadius: 8,
+    flex: 1,
+    height: 48,
+    justifyContent: 'center',
+  },
+  modalButton: {
+    alignItems: 'center',
+    backgroundColor: appColors.primary,
+    borderRadius: 8,
+    height: 48,
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  modalButtonLabel: {
+    color: appColors.white,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 20,
   },
   section: {
     marginBottom: 28,

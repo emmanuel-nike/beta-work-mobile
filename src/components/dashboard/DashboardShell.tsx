@@ -26,7 +26,7 @@ import {
   type IconColorProps,
 } from '../icons';
 import { useAppSelector } from '../../store/hooks';
-import { selectAuthUserRole } from '../../store/slices/authSlice';
+import { selectAppMode } from '../../store/slices/authSlice';
 import { dashboardColors, getTimeGreeting } from '../../theme/dashboard';
 
 export const HEADER_CONTENT_OVERLAP = 50;
@@ -232,13 +232,16 @@ export function DashboardTabBar({
   disabled = false,
   onTabPress,
 }: DashboardTabBarProps) {
-  const role = useAppSelector(selectAuthUserRole);
+  // The Bookings / My Jobs tab follows the active app mode, not the account's
+  // role: an artisan in client mode sees Bookings, and only sees My Jobs while
+  // in artisan mode.
+  const appMode = useAppSelector(selectAppMode);
   const visibleTabs = TAB_ITEMS.filter(item => {
     if (item.id === 'bookings') {
-      return role !== 'artisan';
+      return appMode !== 'artisan';
     }
     if (item.id === 'jobs') {
-      return role === 'artisan';
+      return appMode === 'artisan';
     }
     return true;
   });
