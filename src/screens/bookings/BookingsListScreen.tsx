@@ -20,10 +20,7 @@ import {
   type Booking,
   type BookingFilter,
 } from '../../data/bookings';
-import {
-  useAuthNavigation,
-  useClientTabNavigation,
-} from '../../navigation/types';
+import { useAuthNavigation } from '../../navigation/types';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   loadMyBookings,
@@ -36,7 +33,6 @@ export function BookingsListScreen() {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const authNavigation = useAuthNavigation();
-  const tabNavigation = useClientTabNavigation();
   const [activeFilter, setActiveFilter] = useState<BookingFilter>('all');
 
   const allBookings = useAppSelector(selectBookings);
@@ -91,7 +87,13 @@ export function BookingsListScreen() {
           <ActivityIndicator color={bookingColors.primary} />
         </View>
       ) : bookings.length === 0 ? (
-        <EmptyState onFindArtisans={() => tabNavigation.navigate('home')} />
+        <EmptyState
+          onFindArtisans={() =>
+            authNavigation.navigate('AllArtisans', {
+              title: 'Top artisans near you',
+            })
+          }
+        />
       ) : (
         <FlatList
           contentContainerStyle={[
