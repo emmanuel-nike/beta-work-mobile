@@ -129,7 +129,7 @@ export function UserDashboardScreen() {
 
       <DashboardBookingsSection
         bookings={dashboardBookings}
-        onBookService={openBookings}
+        onBookService={() => openAllArtisans('Top artisans near you')}
         onSeeAll={openBookings}
         onSelectBooking={openBooking}
       />
