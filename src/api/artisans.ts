@@ -20,14 +20,59 @@ type ApiArtisan = Readonly<{
   user?: Readonly<{ firstName: string; lastName: string }> | null;
 }>;
 
+export type ArtisanSort = 'top-rated' | 'nearest' | 'lowest-price';
+
+/** Filters the artisan list can apply; all are sent to `GET /artisans/nearby`. */
+export type NearbyArtisanFilters = Readonly<{
+  limit?: number;
+  /** Free-text search over name and trade. */
+  q?: string;
+  /** Reserved: the backend does not categorise artisans yet. */
+  category?: string;
+  sort?: ArtisanSort;
+  minRating?: number;
+  minDistanceKm?: number;
+  maxDistanceKm?: number;
+  minPrice?: number;
+  maxPrice?: number;
+}>;
+
+function buildQuery(filters: NearbyArtisanFilters): string {
+  const params = new URLSearchParams();
+  const put = (key: string, value: string | number | undefined) => {
+    if (value !== undefined && value !== null && `${value}`.length > 0) {
+      params.set(key, String(value));
+    }
+  };
+
+  put('limit', filters.limit);
+  put('q', filters.q?.trim());
+  if (filters.category && filters.category !== 'all') {
+    put('category', filters.category);
+  }
+  put('sort', filters.sort);
+  if (filters.minRating) {
+    put('minRating', filters.minRating);
+  }
+  put('minDistanceKm', filters.minDistanceKm);
+  put('maxDistanceKm', filters.maxDistanceKm);
+  put('minPrice', filters.minPrice);
+  put('maxPrice', filters.maxPrice);
+
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
+
 /**
- * Fetch verified artisans ranked by proximity for the "artisans near you" rail.
- * Distance is a placeholder from the backend until artisans capture their
- * coordinates.
+ * Fetch verified artisans ranked by proximity for the "artisans near you"
+ * surfaces. Distance is a placeholder from the backend until artisans capture
+ * their coordinates. Pass filters to narrow / sort the list server-side.
  */
-export async function fetchNearbyArtisans(limit = 10): Promise<Artisan[]> {
+export async function fetchNearbyArtisans(
+  filters: NearbyArtisanFilters = {},
+): Promise<Artisan[]> {
   const { data } = await apiRequest<{ data: ApiArtisan[] }>(
-    `/artisans/nearby?limit=${limit}`,
+    `/artisans/nearby${buildQuery(filters)}`,
     { method: 'GET' },
   );
   return data.map(toArtisan);

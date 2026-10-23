@@ -28,7 +28,7 @@ import {
 } from '../../data/artisanProfiles';
 import type { AuthStackScreenProps } from '../../navigation/types';
 import { useAppSelector } from '../../store/hooks';
-import { selectNearbyArtisanById } from '../../store/slices/artisansSlice';
+import { selectArtisanById } from '../../store/slices/artisansSlice';
 
 const SURFACE = '#F4E9DA';
 const TOP_SURFACE = '#F7F1E6';
@@ -48,12 +48,12 @@ export function ArtisanProfileScreen({
   route,
 }: AuthStackScreenProps<'ArtisanProfile'>) {
   const insets = useSafeAreaInsets();
-  // "Artisans near you" cards come from the API, so resolve those ids from the
-  // store; otherwise fall back to the local catalogue.
-  const nearbyArtisan = useAppSelector(state =>
-    selectNearbyArtisanById(state, route.params.artisanId),
+  // API-backed artisan cards (dashboard rail, "All artisans") are cached in the
+  // store by id; fall back to the local catalogue for mock rows.
+  const fetchedArtisan = useAppSelector(state =>
+    selectArtisanById(state, route.params.artisanId),
   );
-  const artisan = findArtisan(route.params.artisanId) ?? nearbyArtisan;
+  const artisan = findArtisan(route.params.artisanId) ?? fetchedArtisan;
   const [isFavourite, setFavourite] = useState(false);
   const [isBioExpanded, setBioExpanded] = useState(false);
 

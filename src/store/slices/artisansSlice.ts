@@ -1,20 +1,39 @@
-import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import {
+  createAsyncThunk,
+  createSlice,
+  type PayloadAction,
+} from '@reduxjs/toolkit';
 
 import { fetchNearbyArtisans } from '../../api/artisans';
 import { ApiError } from '../../api/client';
 import type { Artisan } from '../../data/artisans';
 
 type ArtisansState = {
+  /** The dashboard "Top artisans near you" rail. */
   nearby: Artisan[];
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
   error: string | null;
+  /** Every artisan we have fetched, by id, so profiles resolve by id. */
+  entities: Record<string, Artisan>;
 };
 
 const initialState: ArtisansState = {
   nearby: [],
   status: 'idle',
   error: null,
+  entities: {},
 };
+
+function mergeEntities(
+  entities: Record<string, Artisan>,
+  artisans: Artisan[],
+): Record<string, Artisan> {
+  const next = { ...entities };
+  for (const artisan of artisans) {
+    next[artisan.id] = artisan;
+  }
+  return next;
+}
 
 export const loadNearbyArtisans = createAsyncThunk<
   Artisan[],
@@ -22,7 +41,7 @@ export const loadNearbyArtisans = createAsyncThunk<
   { rejectValue: string }
 >('artisans/loadNearby', async (limit, { rejectWithValue }) => {
   try {
-    return await fetchNearbyArtisans(limit);
+    return await fetchNearbyArtisans({ limit });
   } catch (error) {
     return rejectWithValue(
       error instanceof ApiError
@@ -36,6 +55,13 @@ const artisansSlice = createSlice({
   name: 'artisans',
   initialState,
   reducers: {
+    /** Cache a fetched list (e.g. the filtered AllArtisans view) for lookups. */
+    cacheArtisans(state, action: PayloadAction<Artisan[]>) {
+      return {
+        ...state,
+        entities: mergeEntities(state.entities, action.payload),
+      };
+    },
     clearNearbyArtisans() {
       return initialState;
     },
@@ -53,6 +79,7 @@ const artisansSlice = createSlice({
         status: 'succeeded',
         error: null,
         nearby: action.payload,
+        entities: mergeEntities(state.entities, action.payload),
       }))
       .addCase(loadNearbyArtisans.rejected, (state, action) => {
         state.status = 'failed';
@@ -61,7 +88,7 @@ const artisansSlice = createSlice({
   },
 });
 
-export const { clearNearbyArtisans } = artisansSlice.actions;
+export const { cacheArtisans, clearNearbyArtisans } = artisansSlice.actions;
 export const artisansReducer = artisansSlice.reducer;
 
 type ArtisansRoot = { artisans: ArtisansState };
@@ -70,5 +97,5 @@ export const selectNearbyArtisans = (state: ArtisansRoot) =>
   state.artisans.nearby;
 export const selectNearbyArtisansStatus = (state: ArtisansRoot) =>
   state.artisans.status;
-export const selectNearbyArtisanById = (state: ArtisansRoot, id: string) =>
-  state.artisans.nearby.find(artisan => artisan.id === id);
+export const selectArtisanById = (state: ArtisansRoot, id: string) =>
+  state.artisans.entities[id];

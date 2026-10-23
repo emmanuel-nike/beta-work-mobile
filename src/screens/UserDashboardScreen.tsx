@@ -50,7 +50,7 @@ export function UserDashboardScreen() {
   // Load the client's bookings and nearby artisans from the API on mount.
   useEffect(() => {
     dispatch(loadMyBookings());
-    dispatch(loadNearbyArtisans());
+    dispatch(loadNearbyArtisans(10));
   }, [dispatch]);
 
   const bookings = useAppSelector(selectBookings);
