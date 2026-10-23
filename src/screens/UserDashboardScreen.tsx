@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -19,17 +19,18 @@ import { ChangeLocationModal } from '../components/dashboard/ChangeLocationModal
 import { DashboardBookingsSection } from '../components/dashboard/DashboardBookingsSection';
 import { DashboardArtisanRail } from '../components/dashboard/DashboardArtisanRail';
 import { WhyBetaWorkSection } from '../components/dashboard/WhyBetaWorkSection';
-import {
-  RECENTLY_VIEWED_ARTISANS,
-  TOP_ARTISANS,
-  type Artisan,
-} from '../data/artisans';
+import { RECENTLY_VIEWED_ARTISANS, type Artisan } from '../data/artisans';
 import { ARTISAN_SERVICES } from '../data/artisanServices';
-import { BOOKINGS, type Booking } from '../data/bookings';
+import { type Booking } from '../data/bookings';
 import { DEFAULT_LOCATION_LABEL, type SavedAddress } from '../data/locations';
 import { useAuthNavigation, useClientTabNavigation } from '../navigation/types';
-import { useAppSelector } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import {
+  loadNearbyArtisans,
+  selectNearbyArtisans,
+} from '../store/slices/artisansSlice';
 import { selectAuthUser } from '../store/slices/authSlice';
+import { loadMyBookings, selectBookings } from '../store/slices/bookingsSlice';
 import { dashboardColors } from '../theme/dashboard';
 
 /** The dashboard previews only the most recent bookings. */
@@ -40,14 +41,24 @@ const DASHBOARD_SERVICE_LIMIT = 7;
 const DASHBOARD_SERVICES = ARTISAN_SERVICES.slice(0, DASHBOARD_SERVICE_LIMIT);
 
 export function UserDashboardScreen() {
+  const dispatch = useAppDispatch();
   const user = useAppSelector(selectAuthUser);
   const firstName = user?.firstName?.trim() || 'there';
   const authNavigation = useAuthNavigation();
   const tabNavigation = useClientTabNavigation();
 
+  // Load the client's bookings and nearby artisans from the API on mount.
+  useEffect(() => {
+    dispatch(loadMyBookings());
+    dispatch(loadNearbyArtisans());
+  }, [dispatch]);
+
+  const bookings = useAppSelector(selectBookings);
+  const nearbyArtisans = useAppSelector(selectNearbyArtisans);
+
   const openAllArtisans = (title?: string) =>
     authNavigation.navigate('AllArtisans', title ? { title } : undefined);
-  const dashboardBookings = BOOKINGS.slice(0, DASHBOARD_BOOKING_LIMIT);
+  const dashboardBookings = bookings.slice(0, DASHBOARD_BOOKING_LIMIT);
   const [isLocationPickerOpen, setLocationPickerOpen] = useState(false);
   const [location, setLocation] = useState(DEFAULT_LOCATION_LABEL);
 
@@ -124,7 +135,7 @@ export function UserDashboardScreen() {
       />
 
       <DashboardArtisanRail
-        artisans={TOP_ARTISANS}
+        artisans={nearbyArtisans}
         onSeeAll={() => openAllArtisans('Top artisans near you')}
         onSelectArtisan={handleSelectArtisan}
         title="Top artisans near you"

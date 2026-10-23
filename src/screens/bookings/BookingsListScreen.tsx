@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Pressable,
   ScrollView,
@@ -14,7 +15,6 @@ import { BookingButton } from '../../components/bookings/BookingButton';
 import { BookingCard } from '../../components/bookings/BookingCard';
 import { BookingsHeader } from '../../components/bookings/BookingsHeader';
 import {
-  BOOKINGS,
   BOOKING_FILTERS,
   filterBookings,
   type Booking,
@@ -24,18 +24,33 @@ import {
   useAuthNavigation,
   useClientTabNavigation,
 } from '../../navigation/types';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import {
+  loadMyBookings,
+  selectBookings,
+  selectBookingsStatus,
+} from '../../store/slices/bookingsSlice';
 import { bookingColors } from '../../theme/bookings';
 
 export function BookingsListScreen() {
   const insets = useSafeAreaInsets();
+  const dispatch = useAppDispatch();
   const authNavigation = useAuthNavigation();
   const tabNavigation = useClientTabNavigation();
   const [activeFilter, setActiveFilter] = useState<BookingFilter>('all');
 
+  const allBookings = useAppSelector(selectBookings);
+  const status = useAppSelector(selectBookingsStatus);
+
+  useEffect(() => {
+    dispatch(loadMyBookings());
+  }, [dispatch]);
+
   const bookings = useMemo(
-    () => filterBookings(BOOKINGS, activeFilter),
-    [activeFilter],
+    () => filterBookings(allBookings, activeFilter),
+    [allBookings, activeFilter],
   );
+  const isInitialLoading = status === 'loading' && allBookings.length === 0;
 
   const openBooking = (booking: Booking) =>
     authNavigation.navigate('BookingDetails', { bookingId: booking.id });
@@ -71,7 +86,11 @@ export function BookingsListScreen() {
         })}
       </ScrollView>
 
-      {bookings.length === 0 ? (
+      {isInitialLoading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={bookingColors.primary} />
+        </View>
+      ) : bookings.length === 0 ? (
         <EmptyState onFindArtisans={() => tabNavigation.navigate('home')} />
       ) : (
         <FlatList
@@ -151,6 +170,11 @@ const styles = StyleSheet.create({
   listContent: {
     gap: 12,
     paddingHorizontal: 24,
+  },
+  loading: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
   },
   empty: {
     alignItems: 'center',

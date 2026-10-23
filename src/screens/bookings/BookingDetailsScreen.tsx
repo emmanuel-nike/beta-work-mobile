@@ -9,6 +9,8 @@ import { StatusTimeline } from '../../components/bookings/StatusTimeline';
 import { SuccessModal } from '../../components/bookings/SuccessModal';
 import { InfoIcon, StarIcon } from '../../components/icons';
 import { findBooking, type Booking } from '../../data/bookings';
+import { useAppSelector } from '../../store/hooks';
+import { selectBookingById } from '../../store/slices/bookingsSlice';
 import { bookingColors } from '../../theme/bookings';
 import type { AuthStackScreenProps } from '../../navigation/types';
 
@@ -17,7 +19,11 @@ export function BookingDetailsScreen({
   route,
 }: AuthStackScreenProps<'BookingDetails'>) {
   const insets = useSafeAreaInsets();
-  const booking = findBooking(route.params.bookingId);
+  // Prefer the API-backed booking from the store; fall back to local data.
+  const storedBooking = useAppSelector(state =>
+    selectBookingById(state, route.params.bookingId),
+  );
+  const booking = storedBooking ?? findBooking(route.params.bookingId);
   const [cancelled, setCancelled] = useState(false);
 
   if (!booking) {
