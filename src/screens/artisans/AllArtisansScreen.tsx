@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Pressable,
@@ -11,6 +12,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { fetchNearbyArtisans } from '../../api/artisans';
+import { ApiError } from '../../api/client';
 import {
   DEFAULT_ARTISAN_FILTERS,
   FilterArtisansSheet,
@@ -28,7 +31,6 @@ import {
   StarIcon,
 } from '../../components/icons';
 import {
-  ARTISANS,
   ARTISAN_CATEGORIES,
   formatDistance,
   formatFullPrice,
@@ -38,6 +40,8 @@ import {
 } from '../../data/artisans';
 import { DEFAULT_LOCATION_LABEL } from '../../data/locations';
 import type { AuthStackScreenProps } from '../../navigation/types';
+import { useAppDispatch } from '../../store/hooks';
+import { cacheArtisans } from '../../store/slices/artisansSlice';
 
 const SURFACE = '#F7F1E6';
 const CARD_BORDER = '#DDD0BC';
@@ -53,6 +57,7 @@ export function AllArtisansScreen({
   route,
 }: AuthStackScreenProps<'AllArtisans'>) {
   const insets = useSafeAreaInsets();
+  const dispatch = useAppDispatch();
   const title = route.params?.title ?? 'All artisans';
   const [query, setQuery] = useState(route.params?.query ?? '');
   const [category, setCategory] = useState<ArtisanCategory | 'all'>('all');
@@ -61,46 +66,60 @@ export function AllArtisansScreen({
   const [isFilterOpen, setFilterOpen] = useState(false);
   const [isLocationOpen, setLocationOpen] = useState(false);
   const [location, setLocation] = useState(DEFAULT_LOCATION_LABEL);
+  const [results, setResults] = useState<Artisan[]>([]);
+  const [isLoading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const results = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+  // Fetch from the nearby endpoint with the active filters applied server-side.
+  // Debounced so typing in the search box does not fire a request per keystroke.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
 
-    const matched = ARTISANS.filter(artisan => {
-      if (category !== 'all' && artisan.category !== category) {
-        return false;
-      }
-      if (
-        needle.length > 0 &&
-        !artisan.name.toLowerCase().includes(needle) &&
-        !artisan.trade.toLowerCase().includes(needle)
-      ) {
-        return false;
-      }
-      if (artisan.rating < filters.minRating) {
-        return false;
-      }
-      if (
-        artisan.distanceKm < filters.distance.min ||
-        artisan.distanceKm > filters.distance.max
-      ) {
-        return false;
-      }
-      return (
-        artisan.priceFrom >= filters.price.min &&
-        artisan.priceFrom <= filters.price.max
-      );
-    });
+    const handle = setTimeout(() => {
+      fetchNearbyArtisans({
+        limit: 50,
+        q: query,
+        category,
+        sort: filters.sort,
+        minRating: filters.minRating,
+        minDistanceKm: filters.distance.min,
+        maxDistanceKm: filters.distance.max,
+        minPrice: filters.price.min,
+        maxPrice: filters.price.max,
+      })
+        .then(artisans => {
+          if (cancelled) {
+            return;
+          }
+          setResults(artisans);
+          setError(null);
+          // Cache so the profile screen can resolve a tapped artisan by id.
+          dispatch(cacheArtisans(artisans));
+        })
+        .catch((err: unknown) => {
+          if (cancelled) {
+            return;
+          }
+          setResults([]);
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : 'Unable to load artisans. Pull to retry.',
+          );
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        });
+    }, 300);
 
-    const sorted = [...matched];
-    if (filters.sort === 'nearest') {
-      sorted.sort((a, b) => a.distanceKm - b.distanceKm);
-    } else if (filters.sort === 'lowest-price') {
-      sorted.sort((a, b) => a.priceFrom - b.priceFrom);
-    } else {
-      sorted.sort((a, b) => b.rating - a.rating);
-    }
-    return sorted;
-  }, [category, filters, query]);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [dispatch, query, category, filters]);
 
   const openProfile = (artisan: Artisan) =>
     navigation.navigate('ArtisanProfile', { artisanId: artisan.id });
@@ -191,14 +210,23 @@ export function AllArtisansScreen({
 
       <FlatList
         ListEmptyComponent={
-          <Text style={styles.empty}>
-            No artisans match your search just yet.
-          </Text>
+          isLoading ? (
+            <View style={styles.loading}>
+              <ActivityIndicator color={ACCENT} />
+            </View>
+          ) : (
+            <Text style={styles.empty}>
+              {error ?? 'No artisans match your search just yet.'}
+            </Text>
+          )
         }
         ListHeaderComponent={
-          <Text style={styles.count}>
-            {results.length} {results.length === 1 ? 'artisan' : 'artisans'} nearby
-          </Text>
+          isLoading || error ? null : (
+            <Text style={styles.count}>
+              {results.length} {results.length === 1 ? 'artisan' : 'artisans'}{' '}
+              nearby
+            </Text>
+          )
         }
         contentContainerStyle={[
           styles.listContent,
@@ -446,6 +474,10 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     paddingTop: 24,
     textAlign: 'center',
+  },
+  loading: {
+    alignItems: 'center',
+    paddingTop: 48,
   },
   card: {
     backgroundColor: SURFACE,
