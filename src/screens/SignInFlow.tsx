@@ -313,7 +313,8 @@ function ResetEmailScreen({
   );
 }
 
-const RESET_OTP_EXPIRY_SECONDS = 300;
+/** Resend stays disabled for 1 min 30 secs after a reset code is sent. */
+const RESET_RESEND_COOLDOWN_SECONDS = 90;
 
 function ResetVerifyScreen({
   email,
@@ -330,7 +331,7 @@ function ResetVerifyScreen({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const { canResend, formattedTime, resetCountdown } = useOtpResendCountdown(
-    RESET_OTP_EXPIRY_SECONDS,
+    RESET_RESEND_COOLDOWN_SECONDS,
   );
 
   const resend = async () => {
@@ -475,7 +476,9 @@ function ResetVerifyScreen({
           )}
 
           <Text style={styles.expiry}>
-            This code will expire in {formattedTime}{' '}
+            {canResend
+              ? 'Didn’t get the code? '
+              : `You can resend the code in ${formattedTime} `}
             <Text
               onPress={canResend && !isSubmitting ? resend : undefined}
               style={[styles.link, !canResend && styles.linkDisabled]}>
