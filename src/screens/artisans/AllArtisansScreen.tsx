@@ -16,7 +16,9 @@ import { fetchNearbyArtisans } from '../../api/artisans';
 import { ApiError } from '../../api/client';
 import {
   DEFAULT_ARTISAN_FILTERS,
+  DISTANCE_BOUNDS,
   FilterArtisansSheet,
+  PRICE_BOUNDS,
   type ArtisanFilters,
 } from '../../components/artisans/FilterArtisansSheet';
 import { ChangeLocationModal } from '../../components/dashboard/ChangeLocationModal';
@@ -77,16 +79,27 @@ export function AllArtisansScreen({
     setLoading(true);
 
     const handle = setTimeout(() => {
+      // Only send a bound when the user has narrowed it from the full range; a
+      // full-range slider means "no constraint". Sending the defaults would, for
+      // example, drop every artisan who has not set a price (price_from is null).
       fetchNearbyArtisans({
         limit: 50,
         q: query,
         category,
         sort: filters.sort,
         minRating: filters.minRating,
-        minDistanceKm: filters.distance.min,
-        maxDistanceKm: filters.distance.max,
-        minPrice: filters.price.min,
-        maxPrice: filters.price.max,
+        minDistanceKm:
+          filters.distance.min > DISTANCE_BOUNDS.min
+            ? filters.distance.min
+            : undefined,
+        maxDistanceKm:
+          filters.distance.max < DISTANCE_BOUNDS.max
+            ? filters.distance.max
+            : undefined,
+        minPrice:
+          filters.price.min > PRICE_BOUNDS.min ? filters.price.min : undefined,
+        maxPrice:
+          filters.price.max < PRICE_BOUNDS.max ? filters.price.max : undefined,
       })
         .then(artisans => {
           if (cancelled) {
