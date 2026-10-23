@@ -1,5 +1,7 @@
 import type { ImageSourcePropType } from 'react-native';
 
+import { ARTISAN_SERVICES } from './artisanServices';
+
 export type ArtisanCategory =
   | 'home'
   | 'beauty'
@@ -13,6 +15,11 @@ export type Artisan = Readonly<{
   name: string;
   trade: string;
   category: ArtisanCategory;
+  /**
+   * Catalogue id from `ARTISAN_SERVICES`. Optional so featured rows that are
+   * not tied to a service tile still type-check. The service list reads this.
+   */
+  serviceId?: string;
   image: ImageSourcePropType;
   rating: number;
   reviews: number;
@@ -47,6 +54,7 @@ export const ARTISANS: readonly Artisan[] = [
     id: 'ar-1',
     name: 'Femilayo N.',
     trade: 'Electrician',
+    serviceId: 'electrical',
     category: 'home',
     image: ELECTRICIAN,
     rating: 3.2,
@@ -60,6 +68,7 @@ export const ARTISANS: readonly Artisan[] = [
     id: 'ar-2',
     name: 'Tunde E.',
     trade: 'Plumber',
+    serviceId: 'plumbing',
     category: 'home',
     image: PLUMBER,
     rating: 4.9,
@@ -73,6 +82,7 @@ export const ARTISANS: readonly Artisan[] = [
     id: 'ar-3',
     name: 'Amaka S.',
     trade: 'Hair stylist',
+    serviceId: 'hair',
     category: 'beauty',
     image: STYLIST,
     rating: 4.7,
@@ -86,6 +96,7 @@ export const ARTISANS: readonly Artisan[] = [
     id: 'ar-4',
     name: 'Abraham K.',
     trade: 'Cleaner',
+    serviceId: 'cleaning',
     category: 'home',
     image: PLUMBER,
     rating: 4.4,
@@ -112,6 +123,7 @@ export const ARTISANS: readonly Artisan[] = [
     id: 'ar-6',
     name: 'Keisha K.',
     trade: 'Cleaner',
+    serviceId: 'cleaning',
     category: 'home',
     image: NAIL_TECH,
     rating: 4.1,
@@ -125,6 +137,7 @@ export const ARTISANS: readonly Artisan[] = [
     id: 'ar-7',
     name: 'Mariam Suleiman',
     trade: 'Hair Stylist',
+    serviceId: 'hair',
     category: 'beauty',
     image: STYLIST,
     rating: 4.7,
@@ -138,6 +151,7 @@ export const ARTISANS: readonly Artisan[] = [
     id: 'ar-8',
     name: 'Favour Sang',
     trade: 'Nail Technician',
+    serviceId: 'nails',
     category: 'beauty',
     image: NAIL_TECH,
     rating: 4.8,
@@ -151,6 +165,7 @@ export const ARTISANS: readonly Artisan[] = [
     id: 'ar-9',
     name: 'Chidi Okafor',
     trade: 'Mechanic',
+    serviceId: 'mechanic',
     category: 'auto',
     image: ELECTRICIAN,
     rating: 4.6,
@@ -164,6 +179,7 @@ export const ARTISANS: readonly Artisan[] = [
     id: 'ar-10',
     name: 'Ngozi Peters',
     trade: 'Event decorator',
+    serviceId: 'event-decoration',
     category: 'events',
     image: TAILOR,
     rating: 5,
@@ -177,6 +193,7 @@ export const ARTISANS: readonly Artisan[] = [
     id: 'ar-11',
     name: 'Segun Bello',
     trade: 'Carpenter',
+    serviceId: 'carpentry',
     category: 'home',
     image: PLUMBER,
     rating: 4.5,
@@ -190,6 +207,7 @@ export const ARTISANS: readonly Artisan[] = [
     id: 'ar-12',
     name: 'Ifeanyi Obi',
     trade: 'Phone repair',
+    serviceId: 'phone-repair',
     category: 'tech',
     image: ELECTRICIAN,
     rating: 4.3,
@@ -200,6 +218,99 @@ export const ARTISANS: readonly Artisan[] = [
     availableToday: true,
   },
 ];
+
+const PORTRAITS = [PLUMBER, STYLIST, NAIL_TECH, ELECTRICIAN, TAILOR];
+
+const DUMMY_NAMES = [
+  'Adaeze M.',
+  'Bola K.',
+  'Chinedu O.',
+  'Damilola A.',
+  'Emeka T.',
+  'Fatima L.',
+  'Gbenga P.',
+  'Halima R.',
+  'Ibrahim S.',
+  'Joke F.',
+  'Kunle D.',
+  'Lola B.',
+  'Musa G.',
+  'Nneka C.',
+  'Olumide J.',
+  'Peace U.',
+  'Quadri H.',
+  'Ruth E.',
+  'Seyi W.',
+  'Tobi I.',
+  'Uche N.',
+  'Victoria A.',
+  'Wale O.',
+  'Yemi K.',
+  'Zainab M.',
+  'Chika E.',
+  'Dare L.',
+  'Esther P.',
+  'Femi A.',
+  'Grace O.',
+];
+
+const SERVICE_CATEGORY: Record<string, ArtisanCategory> = {
+  mechanic: 'auto',
+  'car-wash': 'auto',
+  barber: 'beauty',
+  hair: 'beauty',
+  makeup: 'beauty',
+  nails: 'beauty',
+  spa: 'beauty',
+  baking: 'events',
+  catering: 'events',
+  'event-decoration': 'events',
+  photography: 'events',
+  videography: 'events',
+  'bead-making': 'fashion',
+  'shoe-making': 'fashion',
+  'phone-repair': 'tech',
+  tech: 'tech',
+};
+
+/**
+ * Fills out services that the featured list does not cover. Swap
+ * `getArtisansForService` for the artisans-by-service endpoint and drop this.
+ */
+const SERVICE_EXTRAS: readonly Artisan[] = ARTISAN_SERVICES.flatMap(
+  (service, serviceIndex) => {
+    const listed = ARTISANS.filter(artisan => artisan.serviceId === service.id);
+    const missing = Math.max(0, 3 - listed.length);
+    return Array.from({ length: missing }, (_, slot) => {
+      const seed = serviceIndex * 3 + slot;
+      return {
+        id: `svc-${service.id}-${slot}`,
+        name: DUMMY_NAMES[seed % DUMMY_NAMES.length],
+        trade: service.label,
+        serviceId: service.id,
+        category: SERVICE_CATEGORY[service.id] ?? 'home',
+        image: PORTRAITS[seed % PORTRAITS.length],
+        rating: [4.9, 4.6, 4.2, 3.8, 5][seed % 5],
+        reviews: 18 + ((seed * 7) % 110),
+        distanceKm: Number((1.2 + (seed % 9) * 0.6).toFixed(1)),
+        priceFrom: 5000 + (seed % 8) * 3500,
+        jobsCompleted: 8 + (seed % 36),
+        availableToday: seed % 3 !== 0,
+      };
+    });
+  },
+);
+
+const CATALOGUE: readonly Artisan[] = [...ARTISANS, ...SERVICE_EXTRAS];
+
+/** Artisans for one service tile. Replace the body with the service endpoint. */
+export function getArtisansForService(serviceId: string): readonly Artisan[] {
+  return CATALOGUE.filter(artisan => artisan.serviceId === serviceId);
+}
+
+export function findCatalogueArtisan(id: string): Artisan | undefined {
+  return CATALOGUE.find(artisan => artisan.id === id);
+}
 
 export const TOP_ARTISANS: readonly Artisan[] = ARTISANS.slice(0, 6);
 

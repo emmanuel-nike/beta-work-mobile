@@ -1,6 +1,6 @@
 import type { ImageSourcePropType } from 'react-native';
 
-import { ARTISANS, type Artisan } from './artisans';
+import { findCatalogueArtisan, type Artisan } from './artisans';
 
 export type Review = Readonly<{
   id: string;
@@ -136,5 +136,5 @@ export function getArtisanProfile(artisan: Artisan): ArtisanProfile {
 }
 
 export function findArtisan(id: string): Artisan | undefined {
-  return ARTISANS.find(artisan => artisan.id === id);
+  return findCatalogueArtisan(id);
 }

@@ -1,7 +1,7 @@
 import { memo, useState } from 'react';
 import {
   FlatList,
-  type ListRenderItemInfo,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,10 +27,7 @@ import {
 import { ARTISAN_SERVICES } from '../data/artisanServices';
 import { BOOKINGS, type Booking } from '../data/bookings';
 import { DEFAULT_LOCATION_LABEL, type SavedAddress } from '../data/locations';
-import {
-  useAuthNavigation,
-  useClientTabNavigation,
-} from '../navigation/types';
+import { useAuthNavigation, useClientTabNavigation } from '../navigation/types';
 import { useAppSelector } from '../store/hooks';
 import { selectAuthUser } from '../store/slices/authSlice';
 import { dashboardColors } from '../theme/dashboard';
@@ -82,8 +79,12 @@ export function UserDashboardScreen() {
     >
       <View style={styles.servicesSection}>
         <View style={styles.servicesHeader}>
-          <Text style={styles.servicesTitle}>Browse services</Text>
-          <Pressable accessibilityRole="button" style={styles.viewAllButton}>
+          <Text style={styles.servicesTitle}>What services do you need?</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => authNavigation.navigate('AllServices')}
+            style={styles.viewAllButton}
+          >
             <Text style={styles.viewAllLabel}>View all</Text>
           </Pressable>
         </View>
@@ -101,7 +102,14 @@ export function UserDashboardScreen() {
           maxToRenderPerBatch={3}
           nestedScrollEnabled
           removeClippedSubviews
-          renderItem={renderService}
+          renderItem={({ item }) => (
+            <ServiceTile
+              {...item}
+              onPress={() =>
+                authNavigation.navigate('ServiceArtisans', { serviceId: item.id })
+              }
+            />
+          )}
           showsHorizontalScrollIndicator={false}
           style={styles.servicesScroll}
           windowSize={3}
@@ -130,7 +138,6 @@ export function UserDashboardScreen() {
         onSelectArtisan={handleSelectArtisan}
         title="Recently viewed"
       />
-
 
       <View style={styles.section}>
         <SectionHeader title="Tips for hiring" />
@@ -162,18 +169,15 @@ export function UserDashboardScreen() {
 
 type ArtisanService = (typeof ARTISAN_SERVICES)[number];
 
-function renderService({ item }: ListRenderItemInfo<ArtisanService>) {
-  return <ServiceTile {...item} />;
-}
-
 const ServiceTile = memo(function ServiceTile({
-  Artwork,
+  artwork,
   label,
-}: Readonly<ArtisanService>) {
+  onPress,
+}: Readonly<ArtisanService & { onPress: () => void }>) {
   return (
-    <Pressable accessibilityRole="button" style={styles.serviceTile}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.serviceTile}>
       <View style={styles.serviceArtwork}>
-        <Artwork height="100%" width="100%" />
+        <Image resizeMode="contain" source={artwork} style={styles.serviceArtworkImage} />
       </View>
       <Text numberOfLines={2} style={styles.serviceLabel}>
         {label}
@@ -240,6 +244,10 @@ const styles = StyleSheet.create({
     height: 79,
     overflow: 'hidden',
     width: 80,
+  },
+  serviceArtworkImage: {
+    height: '100%',
+    width: '100%',
   },
   serviceLabel: {
     color: dashboardColors.textPrimary,

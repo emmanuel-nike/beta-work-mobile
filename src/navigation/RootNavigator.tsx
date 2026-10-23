@@ -7,7 +7,9 @@ import {
   selectIsAuthenticated,
   selectIsBootstrapping,
 } from '../store/slices/authSlice';
+import { AppModeSwitchHost } from './AppModeSwitchHost';
 import { AuthNavigator } from './AuthNavigator';
+import { navigationRef } from './navigationRef';
 import { PreAuthNavigator } from './PreAuthNavigator';
 
 const MIN_SPLASH_DURATION_MS = 1500;
@@ -30,8 +32,9 @@ export function RootNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       {isAuthenticated ? <AuthNavigator /> : <PreAuthNavigator />}
+      {isAuthenticated ? <AppModeSwitchHost /> : null}
     </NavigationContainer>
   );
 }
