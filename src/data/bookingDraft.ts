@@ -79,6 +79,44 @@ export function formatTime12h(hours24: number, minutes: number): string {
   return `${hours12}:${String(minutes).padStart(2, '0')} ${meridiem}`;
 }
 
+/**
+ * Combine the draft's chosen date (`dateIso`, stored at midnight) with its time
+ * label ("10:00 AM") into an ISO timestamp for the API. Returns null when no
+ * date has been chosen.
+ */
+export function bookingScheduledAtIso(draft: BookingDraft): string | null {
+  if (!draft.dateIso) {
+    return null;
+  }
+  const date = new Date(draft.dateIso);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const time = parseTimeLabel(draft.time);
+  if (time) {
+    date.setHours(time.hours, time.minutes, 0, 0);
+  }
+  return date.toISOString();
+}
+
+/** Parse a "10:00 AM" / "1:30 PM" label into 24h parts, or null if malformed. */
+function parseTimeLabel(
+  time: string | null,
+): { hours: number; minutes: number } | null {
+  if (!time) {
+    return null;
+  }
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(time.trim());
+  if (!match) {
+    return null;
+  }
+  let hours = Number(match[1]) % 12;
+  if (/pm/i.test(match[3])) {
+    hours += 12;
+  }
+  return { hours, minutes: Number(match[2]) };
+}
+
 /** "₦100,000" from a digit string; "" when empty. */
 export function formatBudgetAmount(digits: string): string {
   const clean = digits.replace(/[^\d]/g, '');
