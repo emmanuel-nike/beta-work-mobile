@@ -41,7 +41,7 @@ export function AuthNavigator() {
       <Stack.Screen
         component={BookingDetailsScreen}
         name="BookingDetails"
-        options={{ contentStyle: { backgroundColor: bookingColors.surface } }}
+        options={{ contentStyle: { backgroundColor: '#F7F1E6' } }}
       />
       <Stack.Screen
         component={RaiseDisputeScreen}

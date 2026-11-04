@@ -23,11 +23,14 @@ import {
   MapPinIcon,
 } from '../../components/icons';
 import {
+  bookingDraftFromBooking,
   createEmptyBookingDraft,
   formatBookingDateTime,
   type BookingDraft,
 } from '../../data/bookingDraft';
 import type { AuthStackScreenProps } from '../../navigation/types';
+import { useAppSelector } from '../../store/hooks';
+import { selectBookingById } from '../../store/slices/bookingsSlice';
 import { useBookingArtisan } from './useBookingArtisan';
 
 const SURFACE = '#F7F1E6';
@@ -45,8 +48,17 @@ export function BookServiceScreen({
   route,
 }: AuthStackScreenProps<'BookService'>) {
   const insets = useSafeAreaInsets();
-  const artisan = useBookingArtisan(route.params.artisanId);
-  const [draft, setDraft] = useState<BookingDraft>(createEmptyBookingDraft);
+  const { artisanId, bookingId } = route.params;
+  const isEditing = Boolean(bookingId);
+  const artisan = useBookingArtisan(artisanId);
+  const existingBooking = useAppSelector(state =>
+    bookingId ? selectBookingById(state, bookingId) : undefined,
+  );
+  const [draft, setDraft] = useState<BookingDraft>(() =>
+    existingBooking
+      ? bookingDraftFromBooking(existingBooking)
+      : createEmptyBookingDraft(),
+  );
   const [isServiceOpen, setServiceOpen] = useState(false);
   const [isDateOpen, setDateOpen] = useState(false);
   const [isLocationOpen, setLocationOpen] = useState(false);
@@ -65,8 +77,9 @@ export function BookServiceScreen({
       return;
     }
     navigation.navigate('ReviewBooking', {
-      artisanId: route.params.artisanId,
+      artisanId,
       draft,
+      bookingId,
     });
   };
 
@@ -82,9 +95,13 @@ export function BookServiceScreen({
           <ArrowLeftIcon color={LABEL} />
         </Pressable>
         <View style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>Book a service</Text>
+          <Text style={styles.headerTitle}>
+            {isEditing ? 'Edit booking' : 'Book a service'}
+          </Text>
           <Text style={styles.headerSubtitle}>
-            Tell the artisan what you need help with
+            {isEditing
+              ? 'Update your booking request details'
+              : 'Tell the artisan what you need help with'}
           </Text>
         </View>
         <View style={styles.back} />
@@ -223,11 +240,17 @@ export function BookServiceScreen({
             !canReview && styles.ctaDisabled,
             pressed && styles.pressed,
           ]}>
-          <Text style={styles.ctaLabel}>Review booking</Text>
+          <Text style={styles.ctaLabel}>
+            {isEditing ? 'Review changes' : 'Review booking'}
+          </Text>
         </Pressable>
       </View>
 
       <ServicePickerModal
+        options={(artisan?.services ?? []).map(name => ({
+          id: name,
+          label: name,
+        }))}
         onClose={() => setServiceOpen(false)}
         onSelect={service => {
           update({ serviceId: service.id, serviceLabel: service.label });

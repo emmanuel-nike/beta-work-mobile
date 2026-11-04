@@ -4,9 +4,16 @@ import {
   type PayloadAction,
 } from '@reduxjs/toolkit';
 
-import { fetchNearbyArtisans } from '../../api/artisans';
+import {
+  artisanFromDetail,
+  fetchArtisanDetail,
+  fetchNearbyArtisans,
+  type ArtisanDetail,
+} from '../../api/artisans';
 import { ApiError } from '../../api/client';
 import type { Artisan } from '../../data/artisans';
+
+type DetailStatus = 'loading' | 'succeeded' | 'failed';
 
 type ArtisansState = {
   /** The dashboard "Top artisans near you" rail. */
@@ -15,6 +22,10 @@ type ArtisansState = {
   error: string | null;
   /** Every artisan we have fetched, by id, so profiles resolve by id. */
   entities: Record<string, Artisan>;
+  /** Full public profiles, keyed by artisan id. */
+  details: Record<string, ArtisanDetail>;
+  detailStatus: Record<string, DetailStatus>;
+  detailError: Record<string, string | null>;
 };
 
 const initialState: ArtisansState = {
@@ -22,6 +33,9 @@ const initialState: ArtisansState = {
   status: 'idle',
   error: null,
   entities: {},
+  details: {},
+  detailStatus: {},
+  detailError: {},
 };
 
 function mergeEntities(
@@ -34,6 +48,22 @@ function mergeEntities(
   }
   return next;
 }
+
+export const loadArtisanDetail = createAsyncThunk<
+  ArtisanDetail,
+  string,
+  { rejectValue: string }
+>('artisans/loadDetail', async (id, { rejectWithValue }) => {
+  try {
+    return await fetchArtisanDetail(id);
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof ApiError
+        ? error.message
+        : 'Unable to load this artisan.',
+    );
+  }
+});
 
 export const loadNearbyArtisans = createAsyncThunk<
   Artisan[],
@@ -84,7 +114,32 @@ const artisansSlice = createSlice({
       .addCase(loadNearbyArtisans.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload ?? 'Unable to load artisans near you.';
-      });
+      })
+      .addCase(loadArtisanDetail.pending, (state, action) => ({
+        ...state,
+        detailStatus: { ...state.detailStatus, [action.meta.arg]: 'loading' },
+        detailError: { ...state.detailError, [action.meta.arg]: null },
+      }))
+      .addCase(loadArtisanDetail.fulfilled, (state, action) => ({
+        ...state,
+        detailStatus: {
+          ...state.detailStatus,
+          [action.payload.id]: 'succeeded',
+        },
+        detailError: { ...state.detailError, [action.payload.id]: null },
+        details: { ...state.details, [action.payload.id]: action.payload },
+        entities: mergeEntities(state.entities, [
+          artisanFromDetail(action.payload),
+        ]),
+      }))
+      .addCase(loadArtisanDetail.rejected, (state, action) => ({
+        ...state,
+        detailStatus: { ...state.detailStatus, [action.meta.arg]: 'failed' },
+        detailError: {
+          ...state.detailError,
+          [action.meta.arg]: action.payload ?? 'Unable to load this artisan.',
+        },
+      }));
   },
 });
 
@@ -99,3 +154,9 @@ export const selectNearbyArtisansStatus = (state: ArtisansRoot) =>
   state.artisans.status;
 export const selectArtisanById = (state: ArtisansRoot, id: string) =>
   state.artisans.entities[id];
+export const selectArtisanDetail = (state: ArtisansRoot, id: string) =>
+  state.artisans.details[id];
+export const selectArtisanDetailStatus = (state: ArtisansRoot, id: string) =>
+  state.artisans.detailStatus[id];
+export const selectArtisanDetailError = (state: ArtisansRoot, id: string) =>
+  state.artisans.detailError[id];

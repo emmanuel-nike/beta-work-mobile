@@ -15,6 +15,8 @@ export type TimelineStep = Readonly<{
   id: string;
   label: string;
   state: TimelineState;
+  /** Short note under the step title. */
+  detail?: string;
   date?: string;
   time?: string;
 }>;
@@ -22,6 +24,8 @@ export type TimelineStep = Readonly<{
 export type Booking = Readonly<{
   id: string;
   status: BookingStatus;
+  /** Public artisan profile id, when the booking came from the API. */
+  artisanId?: string;
   artisanName: string;
   /** Shown on the list card, e.g. "Plumber". */
   trade: string;
@@ -32,6 +36,8 @@ export type Booking = Readonly<{
   reviewCount: string;
   distance: string;
   dateTime: string;
+  /** Raw ISO slot time, kept so the edit form can prefill the date picker. */
+  scheduledAtIso?: string | null;
   /** Short address used on the list card. */
   location: string;
   /** Full address used on the details screen. */
