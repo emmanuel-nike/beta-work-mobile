@@ -1,4 +1,13 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BookingArtisanCard } from '../../components/bookings/BookingArtisanCard';
@@ -11,8 +20,13 @@ import {
   MapPinIcon,
   MessageChatIcon,
 } from '../../components/icons';
-import { formatBudgetAmount } from '../../data/bookingDraft';
+import {
+  bookingScheduledAtIso,
+  formatBudgetAmount,
+} from '../../data/bookingDraft';
 import type { AuthStackScreenProps } from '../../navigation/types';
+import { useAppDispatch } from '../../store/hooks';
+import { submitBooking } from '../../store/slices/bookingsSlice';
 import { useBookingArtisan } from './useBookingArtisan';
 
 const SURFACE = '#F7F1E6';
@@ -28,10 +42,50 @@ export function ReviewBookingScreen({
   route,
 }: AuthStackScreenProps<'ReviewBooking'>) {
   const insets = useSafeAreaInsets();
+  const dispatch = useAppDispatch();
   const { artisanId, draft } = route.params;
   const artisan = useBookingArtisan(artisanId);
+  const [isSubmitting, setSubmitting] = useState(false);
 
   const editField = () => navigation.goBack();
+
+  // Numeric ids are API-backed artisans; local catalogue prototypes keep the
+  // demo-only flow until they are served by the same endpoint.
+  const isRemote = /^\d+$/.test(artisanId);
+
+  const sendRequest = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!isRemote) {
+      navigation.navigate('BookingRequested', { artisanId, draft });
+      return;
+    }
+
+    setSubmitting(true);
+    const result = await dispatch(
+      submitBooking({
+        artisanProfileId: Number(artisanId),
+        service: draft.serviceLabel ?? '',
+        jobDescription: draft.jobDescription.trim(),
+        scheduledAt: bookingScheduledAtIso(draft),
+        location: draft.location.trim() || null,
+        budget: draft.budget ? Number(draft.budget) : null,
+        messageToArtisan: draft.message.trim() || null,
+      }),
+    );
+    setSubmitting(false);
+
+    if (submitBooking.fulfilled.match(result)) {
+      navigation.navigate('BookingRequested', { artisanId, draft });
+    } else {
+      Alert.alert(
+        'Booking not sent',
+        result.payload ?? 'Something went wrong. Please try again.',
+      );
+    }
+  };
 
   const rows = [
     {
@@ -133,14 +187,23 @@ export function ReviewBookingScreen({
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable
           accessibilityRole="button"
-          onPress={() =>
-            navigation.navigate('BookingRequested', { artisanId, draft })
-          }
-          style={({ pressed }) => [styles.cta, pressed && styles.pressed]}>
-          <Text style={styles.ctaLabel}>Send booking request</Text>
+          accessibilityState={{ disabled: isSubmitting, busy: isSubmitting }}
+          disabled={isSubmitting}
+          onPress={sendRequest}
+          style={({ pressed }) => [
+            styles.cta,
+            isSubmitting && styles.ctaDisabled,
+            pressed && styles.pressed,
+          ]}>
+          {isSubmitting ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.ctaLabel}>Send booking request</Text>
+          )}
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          disabled={isSubmitting}
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}>
           <Text style={styles.cancelLabel}>Cancel booking</Text>
@@ -266,6 +329,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     height: 54,
     justifyContent: 'center',
+  },
+  ctaDisabled: {
+    opacity: 0.6,
   },
   ctaLabel: {
     color: '#FFFFFF',

@@ -1,6 +1,10 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 
-import { fetchMyBookings } from '../../api/bookings';
+import {
+  createBooking,
+  fetchMyBookings,
+  type CreateBookingInput,
+} from '../../api/bookings';
 import { ApiError } from '../../api/client';
 import type { Booking } from '../../data/bookings';
 
@@ -32,6 +36,22 @@ export const loadMyBookings = createAsyncThunk<
   }
 });
 
+export const submitBooking = createAsyncThunk<
+  Booking,
+  CreateBookingInput,
+  { rejectValue: string }
+>('bookings/submit', async (input, { rejectWithValue }) => {
+  try {
+    return await createBooking(input);
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof ApiError
+        ? error.message
+        : 'Unable to send your booking request.',
+    );
+  }
+});
+
 const bookingsSlice = createSlice({
   name: 'bookings',
   initialState,
@@ -57,7 +77,16 @@ const bookingsSlice = createSlice({
       .addCase(loadMyBookings.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload ?? 'Unable to load your bookings.';
-      });
+      })
+      // Surface the new booking immediately so "View booking" shows it before
+      // the next refresh. Return fresh state: Booking carries readonly fields.
+      .addCase(submitBooking.fulfilled, (state, action) => ({
+        ...state,
+        items: [
+          action.payload,
+          ...state.items.filter(booking => booking.id !== action.payload.id),
+        ],
+      }));
   },
 });
 

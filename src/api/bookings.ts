@@ -49,6 +49,30 @@ export async function fetchMyBookings(): Promise<Booking[]> {
   return data.map(toBooking);
 }
 
+/** The fields the client submits to request a booking. */
+export type CreateBookingInput = Readonly<{
+  /** Public artisan profile id (from `GET /artisans/:id`). */
+  artisanProfileId: number;
+  service: string;
+  jobDescription: string;
+  /** ISO timestamp of the requested slot, or null when unset. */
+  scheduledAt: string | null;
+  location: string | null;
+  budget: number | null;
+  messageToArtisan: string | null;
+}>;
+
+/** Create a booking request for an artisan; returns the created booking. */
+export async function createBooking(
+  input: CreateBookingInput,
+): Promise<Booking> {
+  const { booking } = await apiRequest<{ booking: ApiBooking }>('/bookings', {
+    method: 'POST',
+    body: input,
+  });
+  return toBooking(booking);
+}
+
 const MONTHS = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
