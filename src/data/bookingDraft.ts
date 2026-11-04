@@ -1,4 +1,5 @@
 import { ARTISAN_SERVICES } from './artisanServices';
+import type { Booking } from './bookings';
 
 /**
  * The booking the client is composing across the Book a service → Review →
@@ -32,6 +33,36 @@ export function createEmptyBookingDraft(): BookingDraft {
     budget: '',
     message: '',
   };
+}
+
+/**
+ * Prefill a draft from an existing booking so the edit form opens populated.
+ * The service name doubles as its id (the picker keys services by name).
+ */
+export function bookingDraftFromBooking(booking: Booking): BookingDraft {
+  const draft = createEmptyBookingDraft();
+  draft.serviceId = booking.service || null;
+  draft.serviceLabel = booking.service || null;
+  draft.jobDescription = booking.jobDescription ?? '';
+  draft.location = booking.location || booking.address || '';
+  draft.budget = (booking.budget ?? '').replace(/[^\d]/g, '');
+  draft.message = booking.messageToArtisan ?? '';
+
+  if (booking.scheduledAtIso) {
+    const date = new Date(booking.scheduledAtIso);
+    if (!Number.isNaN(date.getTime())) {
+      const time = formatTime12h(date.getHours(), date.getMinutes());
+      draft.dateIso = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+      ).toISOString();
+      draft.time = time;
+      draft.dateTimeLabel = formatBookingDateTime(date, time);
+    }
+  }
+
+  return draft;
 }
 
 /** Services offered, used by the Service dropdown. */

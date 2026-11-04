@@ -17,6 +17,16 @@ export type RatingBreakdown = Readonly<{
   count: number;
 }>;
 
+export type OfferedService = Readonly<{
+  name: string;
+  priceLabel: string;
+}>;
+
+export type TrustItem = Readonly<{
+  title: string;
+  detail: string;
+}>;
+
 export type ArtisanProfile = Readonly<{
   headline: string;
   bio: string;
@@ -24,14 +34,15 @@ export type ArtisanProfile = Readonly<{
   yearsExperience: number;
   area: string;
   languages: string;
-  skills: readonly string[];
+  traits: readonly string[];
+  services: readonly OfferedService[];
   gallery: readonly ImageSourcePropType[];
   map: ImageSourcePropType;
   averageRating: number;
   totalReviews: number;
   breakdown: readonly RatingBreakdown[];
   reviews: readonly Review[];
-  verification: readonly string[];
+  verification: readonly TrustItem[];
   terms: ReadonlyArray<{ label: string; detail: string }>;
 }>;
 
@@ -53,12 +64,13 @@ const SHARED_PROFILE = {
   bio: "I'm Tunde, and I've been serving homes in Abuja for over 10 years. From leaky taps to complete bathroom renovations, I focus on permanent fixes, not quick patch-ups. I guarantee all my work and prioritize leaving your space cleaner than I found it. Every job is quoted up front, so there are no surprises when the work is done.",
   area: 'Wuse 2, Abuja',
   languages: 'Speaks English, Yoruba',
-  skills: [
-    'Tap & Sink Repair: (Quote Needed)',
-    'Toilet Installation & Repair: (Quote Needed)',
-    'Burst Pipe Emergency: (Quote Needed)',
-    'Water Heater Installation: (Quote Needed)',
-    'Full Bathroom Remodel: (Quote Needed)',
+  traits: ['Professional & reliable'],
+  services: [
+    { name: 'Tap & sink repair', priceLabel: 'From ₦15,000' },
+    { name: 'Toilet installation & repair', priceLabel: 'Get a quote' },
+    { name: 'Burst pipe emergency', priceLabel: 'Get a quote' },
+    { name: 'Water heater installation', priceLabel: 'From ₦20,000' },
+    { name: 'Full bathroom remodel', priceLabel: 'Get a quote' },
   ],
   gallery: GALLERY,
   map: MAP,
@@ -100,28 +112,19 @@ const SHARED_PROFILE = {
     },
   ],
   verification: [
-    'Background checked and verified by our team.',
-    'Fully licensed & certified in plumbing',
-    'Certified HSE officer',
-    'Water Heater Installation: (Quote Needed)',
-    'Full Bathroom Remodel: (Quote Needed)',
+    { title: 'Identity verified', detail: 'Government ID verified' },
+    { title: 'Background checked', detail: 'Verified by Beta Work' },
+    { title: 'Plumbing certification', detail: 'Certified professional' },
+    {
+      title: 'HSE certified',
+      detail: 'Health, safety and environment training',
+    },
   ],
   terms: [
-    {
-      label: 'Service Guarantee',
-      detail: 'I ensure all plumbing work is leak-tested before completion.',
-    },
-    { label: 'Availability', detail: 'I work Monday–Saturday, 8 AM–6 PM.' },
-    { label: 'Payment Terms', detail: 'Payment upon completion of job.' },
-    {
-      label: 'Cancellations',
-      detail: 'Please cancel at least 2 hours before scheduled time.',
-    },
-    {
-      label: 'Safety Policy',
-      detail: 'Certified in HSE Level 1 – Complies with site safety standards.',
-    },
-    { label: 'Warranty', detail: 'Repairs covered for 3 days after service.' },
+    { label: 'Availability', detail: 'Mon – Sat, 8:00 AM – 6:00 PM' },
+    { label: 'Payment', detail: 'Payment after service' },
+    { label: 'Cancellation policy', detail: 'Cancel at least 2 hours before' },
+    { label: 'Warranty', detail: '3-day repair warranty' },
   ],
 } as const;
 

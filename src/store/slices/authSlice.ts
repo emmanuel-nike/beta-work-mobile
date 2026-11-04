@@ -19,7 +19,9 @@ import { ApiError, setAuthToken } from '../../api/client';
 import type { PortfolioForm } from '../../data/artisanPortfolio';
 import {
   clearStoredSession,
+  loadStoredAppMode,
   loadStoredSession,
+  persistAppMode,
   persistSession,
 } from '../authStorage';
 
@@ -64,6 +66,19 @@ function defaultAppMode(user: AuthUser | null | undefined): AppMode {
   return user?.role === 'artisan' ? 'artisan' : 'client';
 }
 
+/**
+ * Prefer the mode this user last chose on this device. Non-artisans stay in
+ * the client experience even if an older artisan choice is still stored.
+ */
+async function resolveAppMode(user: AuthUser): Promise<AppMode> {
+  if (user.role !== 'artisan') {
+    return 'client';
+  }
+
+  const stored = await loadStoredAppMode(user.id);
+  return stored ?? 'artisan';
+}
+
 const initialState: AuthState = {
   isAuthenticated: false,
   isBootstrapping: true,
@@ -86,38 +101,37 @@ function sessionFromTokenResponse(payload: AuthTokenResponse): AuthSession {
   };
 }
 
-export const bootstrapAuth = createAsyncThunk<AuthSession | null>(
-  'auth/bootstrap',
-  async () => {
-    const stored = await loadStoredSession();
-    if (!stored?.token) {
+export const bootstrapAuth = createAsyncThunk<
+  (AuthSession & { appMode: AppMode }) | null
+>('auth/bootstrap', async () => {
+  const stored = await loadStoredSession();
+  if (!stored?.token) {
+    return null;
+  }
+
+  setAuthToken(stored.token);
+
+  try {
+    const { user } = await fetchCurrentUser();
+    const refreshed: AuthSession = {
+      token: stored.token,
+      tokenType: stored.tokenType,
+      user,
+    };
+    await persistSession(refreshed);
+    return { ...refreshed, appMode: await resolveAppMode(user) };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      await clearStoredSession();
+      setAuthToken(null);
       return null;
     }
-
-    setAuthToken(stored.token);
-
-    try {
-      const { user } = await fetchCurrentUser();
-      const refreshed: AuthSession = {
-        token: stored.token,
-        tokenType: stored.tokenType,
-        user,
-      };
-      await persistSession(refreshed);
-      return refreshed;
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        await clearStoredSession();
-        setAuthToken(null);
-        return null;
-      }
-      return stored;
-    }
-  },
-);
+    return { ...stored, appMode: await resolveAppMode(stored.user) };
+  }
+});
 
 export const loginUser = createAsyncThunk<
-  AuthSession,
+  AuthSession & { appMode: AppMode },
   { email: string; password: string },
   { rejectValue: string }
 >('auth/login', async ({ email, password }, { rejectWithValue }) => {
@@ -125,7 +139,7 @@ export const loginUser = createAsyncThunk<
     const response = await login(email, password);
     const session = sessionFromTokenResponse(response);
     await persistSession(session);
-    return session;
+    return { ...session, appMode: await resolveAppMode(session.user) };
   } catch (error) {
     return rejectWithValue(
       error instanceof ApiError
@@ -145,6 +159,9 @@ export const refreshCurrentUser = createAsyncThunk<
     const { token, tokenType } = getState().auth;
     if (token) {
       await persistSession({ token, tokenType, user });
+    }
+    if (user.role !== 'artisan') {
+      await persistAppMode(user.id, 'client');
     }
     return user;
   } catch (error) {
@@ -299,7 +316,7 @@ const authSlice = createSlice({
           state.token = action.payload.token;
           state.tokenType = action.payload.tokenType;
           state.user = action.payload.user;
-          state.appMode = defaultAppMode(action.payload.user);
+          state.appMode = action.payload.appMode;
         }
       })
       .addCase(bootstrapAuth.rejected, state => {
@@ -314,7 +331,7 @@ const authSlice = createSlice({
         state.token = action.payload.token;
         state.tokenType = action.payload.tokenType;
         state.user = action.payload.user;
-        state.appMode = defaultAppMode(action.payload.user);
+        state.appMode = action.payload.appMode;
         state.status = 'idle';
         state.error = null;
       })
@@ -372,6 +389,19 @@ export const {
   signOut,
   clearAuthError,
 } = authSlice.actions;
+
+/** Applies the in-flight mode switch and saves it for this user id. */
+export const commitAppModeSwitch = createAsyncThunk<
+  void,
+  void,
+  { state: { auth: AuthState } }
+>('auth/commitAppModeSwitch', async (_, { dispatch, getState }) => {
+  dispatch(applyPendingAppMode());
+  const { user, appMode } = getState().auth;
+  if (user) {
+    await persistAppMode(user.id, appMode);
+  }
+});
 export const authReducer = authSlice.reducer;
 export { sessionFromTokenResponse };
 

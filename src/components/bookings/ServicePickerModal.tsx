@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SERVICE_OPTIONS } from '../../data/bookingDraft';
 import { CheckIcon, CloseIcon } from '../icons';
 
 const SURFACE = '#FBF6EC';
@@ -17,16 +16,21 @@ const LABEL = '#3D2E22';
 const DIVIDER = '#E5DAC6';
 const ACCENT = '#0F6743';
 
+type ServiceOption = Readonly<{ id: string; label: string }>;
+
 type ServicePickerModalProps = Readonly<{
   visible: boolean;
   selectedId: string | null;
+  /** The services offered by the artisan being booked. */
+  options: readonly ServiceOption[];
   onClose: () => void;
-  onSelect: (service: { id: string; label: string }) => void;
+  onSelect: (service: ServiceOption) => void;
 }>;
 
 export function ServicePickerModal({
   visible,
   selectedId,
+  options,
   onClose,
   onSelect,
 }: ServicePickerModalProps) {
@@ -61,9 +65,15 @@ export function ServicePickerModal({
           </View>
 
           <FlatList
-            data={SERVICE_OPTIONS}
+            data={options}
             keyExtractor={item => item.id}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
             ItemSeparatorComponent={Separator}
+            ListEmptyComponent={
+              <Text style={styles.empty}>
+                This artisan hasn&apos;t listed any services yet.
+              </Text>
+            }
             renderItem={({ item }) => {
               const selected = item.id === selectedId;
               return (
@@ -160,6 +170,13 @@ const styles = StyleSheet.create({
   divider: {
     backgroundColor: DIVIDER,
     height: StyleSheet.hairlineWidth,
+  },
+  empty: {
+    color: LABEL,
+    fontSize: 14,
+    lineHeight: 20,
+    paddingVertical: 24,
+    textAlign: 'center',
   },
   pressed: {
     opacity: 0.6,

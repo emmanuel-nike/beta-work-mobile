@@ -3,7 +3,9 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import {
   createBooking,
   fetchMyBookings,
+  updateBooking,
   type CreateBookingInput,
+  type UpdateBookingInput,
 } from '../../api/bookings';
 import { ApiError } from '../../api/client';
 import type { Booking } from '../../data/bookings';
@@ -52,6 +54,22 @@ export const submitBooking = createAsyncThunk<
   }
 });
 
+export const editBooking = createAsyncThunk<
+  Booking,
+  { id: string; input: UpdateBookingInput },
+  { rejectValue: string }
+>('bookings/edit', async ({ id, input }, { rejectWithValue }) => {
+  try {
+    return await updateBooking(id, input);
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof ApiError
+        ? error.message
+        : 'Unable to update your booking.',
+    );
+  }
+});
+
 const bookingsSlice = createSlice({
   name: 'bookings',
   initialState,
@@ -86,6 +104,13 @@ const bookingsSlice = createSlice({
           action.payload,
           ...state.items.filter(booking => booking.id !== action.payload.id),
         ],
+      }))
+      // Replace the edited booking in place so the details screen reflects it.
+      .addCase(editBooking.fulfilled, (state, action) => ({
+        ...state,
+        items: state.items.map(booking =>
+          booking.id === action.payload.id ? action.payload : booking,
+        ),
       }));
   },
 });

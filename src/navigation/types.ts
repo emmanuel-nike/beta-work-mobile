@@ -47,9 +47,9 @@ export type AuthStackParamList = {
   AllServices: undefined
   ServiceArtisans: { serviceId: string }
   ArtisanProfile: { artisanId: string }
-  BookService: { artisanId: string }
-  ReviewBooking: { artisanId: string; draft: BookingDraft }
-  BookingRequested: { artisanId: string; draft: BookingDraft }
+  BookService: { artisanId: string; bookingId?: string }
+  ReviewBooking: { artisanId: string; draft: BookingDraft; bookingId?: string }
+  BookingRequested: { artisanId: string; draft: BookingDraft; bookingId?: string }
   EditProfile: undefined
   ChangePassword: undefined
   ArtisanJobDetail: { jobId: string }

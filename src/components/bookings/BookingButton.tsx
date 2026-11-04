@@ -41,10 +41,12 @@ export function BookingButton({
       style={({ pressed }) => [
         styles.button,
         compact && styles.compact,
-        isPrimary
-          ? { backgroundColor: disabled ? bookingColors.disabled : accent }
-          : { borderColor: disabled ? bookingColors.disabled : accent, borderWidth: 1 },
-        pressed && styles.pressed,
+        disabled
+          ? styles.disabled
+          : isPrimary
+            ? { backgroundColor: accent }
+            : { borderColor: accent, borderWidth: 1 },
+        pressed && !disabled && styles.pressed,
         style,
       ]}
     >
@@ -52,10 +54,10 @@ export function BookingButton({
         style={[
           styles.label,
           {
-            color: isPrimary
-              ? bookingColors.white
-              : disabled
-                ? bookingColors.disabled
+            color: disabled
+              ? bookingColors.disabledText
+              : isPrimary
+                ? bookingColors.white
                 : accent,
           },
         ]}
@@ -69,14 +71,17 @@ export function BookingButton({
 const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
+    alignSelf: 'stretch',
     borderRadius: 6,
     height: 56,
     justifyContent: 'center',
     paddingHorizontal: 16,
-    width: '100%',
   },
   compact: {
     height: 48,
+  },
+  disabled: {
+    backgroundColor: bookingColors.disabledSurface,
   },
   label: {
     fontSize: 14,

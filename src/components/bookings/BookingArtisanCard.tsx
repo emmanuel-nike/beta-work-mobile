@@ -30,11 +30,13 @@ export function BookingArtisanCard({
           <Text style={styles.meta}>
             {formatRating(artisan.rating)} ({artisan.reviews} reviews)
           </Text>
-          <MapPinIcon color={MUTED} size={13} />
-          <Text numberOfLines={1} style={styles.metaMuted}>
-            {artisan.area}
-          </Text>
         </View>
+        {artisan.area ? (
+          <View style={styles.addressRow}>
+            <MapPinIcon color={MUTED} size={13} />
+            <Text style={styles.metaMuted}>{artisan.area}</Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -73,20 +75,24 @@ const styles = StyleSheet.create({
   metaRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 4,
     marginTop: 2,
+  },
+  addressRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 4,
   },
   meta: {
     color: META,
     fontSize: 12,
     fontWeight: '600',
     lineHeight: 16,
-    marginRight: 6,
   },
   metaMuted: {
     color: MUTED,
-    flexShrink: 1,
+    flex: 1,
     fontSize: 12,
     lineHeight: 16,
   },

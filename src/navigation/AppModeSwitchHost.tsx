@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { ModeSwitchedSheet } from '../components/profile/ModeSwitchedSheet';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
-  applyPendingAppMode,
+  commitAppModeSwitch,
   loadArtisanProfile,
   refreshCurrentUser,
   selectPendingAppMode,
@@ -23,28 +23,30 @@ export function AppModeSwitchHost() {
 
     const nextMode = pendingAppMode;
     const timer = setTimeout(() => {
-      dispatch(applyPendingAppMode());
-      dispatch(refreshCurrentUser());
-      if (nextMode === 'artisan') {
-        dispatch(loadArtisanProfile());
-      }
+      void (async () => {
+        await dispatch(commitAppModeSwitch());
+        dispatch(refreshCurrentUser());
+        if (nextMode === 'artisan') {
+          dispatch(loadArtisanProfile());
+        }
 
-      if (navigationRef.isReady()) {
-        navigationRef.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [
-              {
-                name: 'Dashboard',
-                state: {
-                  index: 0,
-                  routes: [{ name: 'home' }],
+        if (navigationRef.isReady()) {
+          navigationRef.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [
+                {
+                  name: 'Dashboard',
+                  state: {
+                    index: 0,
+                    routes: [{ name: 'home' }],
+                  },
                 },
-              },
-            ],
-          }),
-        );
-      }
+              ],
+            }),
+          );
+        }
+      })();
     }, 2000);
 
     return () => clearTimeout(timer);
