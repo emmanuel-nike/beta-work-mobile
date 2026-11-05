@@ -26,7 +26,7 @@ import {
 } from '../../data/bookingDraft';
 import type { AuthStackScreenProps } from '../../navigation/types';
 import { useAppDispatch } from '../../store/hooks';
-import { submitBooking } from '../../store/slices/bookingsSlice';
+import { editBooking, submitBooking } from '../../store/slices/bookingsSlice';
 import { useBookingArtisan } from './useBookingArtisan';
 
 const SURFACE = '#F7F1E6';
@@ -43,37 +43,59 @@ export function ReviewBookingScreen({
 }: AuthStackScreenProps<'ReviewBooking'>) {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
-  const { artisanId, draft } = route.params;
+  const { artisanId, draft, bookingId } = route.params;
+  const isEditing = Boolean(bookingId);
   const artisan = useBookingArtisan(artisanId);
   const [isSubmitting, setSubmitting] = useState(false);
 
   const editField = () => navigation.goBack();
-
-  // Numeric ids are API-backed artisans; local catalogue prototypes keep the
-  // demo-only flow until they are served by the same endpoint.
-  const isRemote = /^\d+$/.test(artisanId);
 
   const sendRequest = async () => {
     if (isSubmitting) {
       return;
     }
 
-    if (!isRemote) {
+    const details = {
+      service: draft.serviceLabel ?? '',
+      jobDescription: draft.jobDescription.trim(),
+      scheduledAt: bookingScheduledAtIso(draft),
+      location: draft.location.trim() || null,
+      budget: draft.budget ? Number(draft.budget) : null,
+      messageToArtisan: draft.message.trim() || null,
+    };
+
+    // Editing an existing booking: persist the change, then return to details.
+    if (bookingId) {
+      // Numeric ids are API-backed; demo bookings just navigate back.
+      if (!/^\d+$/.test(bookingId)) {
+        navigation.navigate('BookingDetails', { bookingId });
+        return;
+      }
+      setSubmitting(true);
+      const result = await dispatch(editBooking({ id: bookingId, input: details }));
+      setSubmitting(false);
+
+      if (editBooking.fulfilled.match(result)) {
+        navigation.navigate('BookingDetails', { bookingId });
+      } else {
+        Alert.alert(
+          'Changes not saved',
+          result.payload ?? 'Something went wrong. Please try again.',
+        );
+      }
+      return;
+    }
+
+    // Creating a new booking.
+    // Numeric artisan ids are API-backed; demo catalogue artisans navigate only.
+    if (!/^\d+$/.test(artisanId)) {
       navigation.navigate('BookingRequested', { artisanId, draft });
       return;
     }
 
     setSubmitting(true);
     const result = await dispatch(
-      submitBooking({
-        artisanProfileId: Number(artisanId),
-        service: draft.serviceLabel ?? '',
-        jobDescription: draft.jobDescription.trim(),
-        scheduledAt: bookingScheduledAtIso(draft),
-        location: draft.location.trim() || null,
-        budget: draft.budget ? Number(draft.budget) : null,
-        messageToArtisan: draft.message.trim() || null,
-      }),
+      submitBooking({ artisanProfileId: Number(artisanId), ...details }),
     );
     setSubmitting(false);
 
@@ -138,9 +160,13 @@ export function ReviewBookingScreen({
           <ArrowLeftIcon color={LABEL} />
         </Pressable>
         <View style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>Review booking</Text>
+          <Text style={styles.headerTitle}>
+            {isEditing ? 'Review changes' : 'Review booking'}
+          </Text>
           <Text style={styles.headerSubtitle}>
-            Please confirm your booking details
+            {isEditing
+              ? 'Confirm your updated booking details'
+              : 'Please confirm your booking details'}
           </Text>
         </View>
         <View style={styles.back} />
@@ -198,7 +224,9 @@ export function ReviewBookingScreen({
           {isSubmitting ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.ctaLabel}>Send booking request</Text>
+            <Text style={styles.ctaLabel}>
+              {isEditing ? 'Save changes' : 'Send booking request'}
+            </Text>
           )}
         </Pressable>
         <Pressable
@@ -206,7 +234,9 @@ export function ReviewBookingScreen({
           disabled={isSubmitting}
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}>
-          <Text style={styles.cancelLabel}>Cancel booking</Text>
+          <Text style={styles.cancelLabel}>
+            {isEditing ? 'Discard changes' : 'Cancel booking'}
+          </Text>
         </Pressable>
       </View>
     </View>

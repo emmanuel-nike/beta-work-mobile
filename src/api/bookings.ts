@@ -73,6 +73,21 @@ export async function createBooking(
   return toBooking(booking);
 }
 
+/** Editable fields of a booking; the artisan cannot be changed. */
+export type UpdateBookingInput = Omit<CreateBookingInput, 'artisanProfileId'>;
+
+/** Edit an existing (pending) booking; returns the updated booking. */
+export async function updateBooking(
+  id: string,
+  input: UpdateBookingInput,
+): Promise<Booking> {
+  const { booking } = await apiRequest<{ booking: ApiBooking }>(
+    `/bookings/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: input },
+  );
+  return toBooking(booking);
+}
+
 const MONTHS = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -140,13 +155,40 @@ const STEP_LABELS = [
 function timelineForStatus(api: ApiBooking): readonly TimelineStep[] {
   const states = stepStates(api);
   const cancelledIndex = states.indexOf('cancelled');
+  // Stamp the steps we have real timestamps for: "Request sent" is when the
+  // booking was created, and the cancelled step carries the cancellation time.
+  const created = stepStamp(api.createdAt);
+  const cancelled = stepStamp(api.cancelledAt);
 
-  return STEP_IDS.map((id, index) => ({
-    id,
-    label:
-      cancelledIndex === index ? 'Job canceled' : STEP_LABELS[index],
-    state: states[index],
-  }));
+  return STEP_IDS.map((id, index) => {
+    const stamp =
+      id === 'request-sent'
+        ? created
+        : states[index] === 'cancelled'
+          ? cancelled
+          : {};
+    return {
+      id,
+      label: cancelledIndex === index ? 'Job canceled' : STEP_LABELS[index],
+      state: states[index],
+      ...stamp,
+    };
+  });
+}
+
+/** Split an ISO timestamp into the "09 Nov" / "4:10 PM" parts the timeline shows. */
+function stepStamp(iso: string | null): { date?: string; time?: string } {
+  if (!iso) {
+    return {};
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return {};
+  }
+  return {
+    date: `${String(date.getDate()).padStart(2, '0')} ${MONTHS[date.getMonth()]}`,
+    time: formatDateTime(iso).split(' • ')[1],
+  };
 }
 
 function stepStates(api: ApiBooking): TimelineState[] {
@@ -175,6 +217,7 @@ function toBooking(api: ApiBooking): Booking {
   return {
     id: String(api.id),
     status: api.status,
+    artisanId: String(api.artisan.id),
     artisanName: api.artisan.name ?? 'Artisan',
     trade: api.trade,
     tradeFull: api.artisan.trade || api.trade,
@@ -183,6 +226,7 @@ function toBooking(api: ApiBooking): Booking {
     reviewCount: String(api.artisan.reviewsCount ?? 0),
     distance: `${api.artisan.distanceKm} km away`,
     dateTime: formatDateTime(api.scheduledAt),
+    scheduledAtIso: api.scheduledAt,
     location: api.location ?? '',
     address: api.address ?? '',
     service: api.service,

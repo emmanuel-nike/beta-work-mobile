@@ -4,7 +4,12 @@ import type { TimelineState, TimelineStep } from '../../data/bookings';
 import { bookingColors, timelineColors } from '../../theme/bookings';
 import { CheckIcon, CloseIcon } from '../icons';
 
-const DOT_SIZE = 18;
+const DOT_SIZE = 20;
+
+function timestamp(step: TimelineStep): string {
+  const parts = [step.date, step.time].filter(Boolean);
+  return parts.length > 0 ? parts.join(', ') : '—';
+}
 const ROW_GAP = 28;
 
 const DOT_COLORS: Record<TimelineState, string> = {
@@ -20,7 +25,7 @@ type StatusTimelineProps = Readonly<{
 
 export function StatusTimeline({ steps }: StatusTimelineProps) {
   return (
-    <View style={styles.card}>
+    <View style={styles.container}>
       {steps.map((step, index) => {
         const isLast = index === steps.length - 1;
         const isMuted = step.state === 'pending';
@@ -31,7 +36,14 @@ export function StatusTimeline({ steps }: StatusTimelineProps) {
               <View
                 style={[
                   styles.dot,
-                  { backgroundColor: DOT_COLORS[step.state] },
+                  step.state === 'active' && styles.dotActive,
+                  step.state === 'pending' && styles.dotPending,
+                  step.state === 'done' && {
+                    backgroundColor: DOT_COLORS.done,
+                  },
+                  step.state === 'cancelled' && {
+                    backgroundColor: DOT_COLORS.cancelled,
+                  },
                 ]}
               >
                 {step.state === 'done' ? <CheckIcon /> : null}
@@ -39,7 +51,14 @@ export function StatusTimeline({ steps }: StatusTimelineProps) {
                   <CloseIcon color={bookingColors.white} size={10} />
                 ) : null}
               </View>
-              {isLast ? null : <View style={styles.track} />}
+              {isLast ? null : (
+                <View
+                  style={[
+                    styles.track,
+                    step.state === 'done' && styles.trackDone,
+                  ]}
+                />
+              )}
             </View>
 
             <View style={[styles.content, isLast && styles.contentLast]}>
@@ -54,9 +73,9 @@ export function StatusTimeline({ steps }: StatusTimelineProps) {
                 >
                   {step.label}
                 </Text>
-                {step.date ? <Text style={styles.date}>{step.date}</Text> : null}
+                <Text style={styles.date}>{timestamp(step)}</Text>
               </View>
-              {step.time ? <Text style={styles.time}>{step.time}</Text> : null}
+              {step.detail ? <Text style={styles.time}>{step.detail}</Text> : null}
             </View>
           </View>
         );
@@ -66,12 +85,8 @@ export function StatusTimeline({ steps }: StatusTimelineProps) {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: bookingColors.card,
-    borderColor: bookingColors.cardBorder,
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 16,
+  container: {
+    paddingTop: 4,
   },
   row: {
     flexDirection: 'row',
@@ -83,15 +98,27 @@ const styles = StyleSheet.create({
   },
   dot: {
     alignItems: 'center',
+    backgroundColor: 'transparent',
     borderRadius: DOT_SIZE / 2,
     height: DOT_SIZE,
     justifyContent: 'center',
     width: DOT_SIZE,
   },
+  dotActive: {
+    borderColor: timelineColors.active,
+    borderWidth: 2,
+  },
+  dotPending: {
+    borderColor: timelineColors.pending,
+    borderWidth: 2,
+  },
   track: {
     backgroundColor: timelineColors.track,
     flex: 1,
     width: 2,
+  },
+  trackDone: {
+    backgroundColor: timelineColors.done,
   },
   content: {
     flex: 1,
@@ -110,7 +137,7 @@ const styles = StyleSheet.create({
     color: bookingColors.textPrimary,
     flex: 1,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     lineHeight: 18,
   },
   labelMuted: {

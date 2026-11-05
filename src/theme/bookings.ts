@@ -8,6 +8,9 @@ export const bookingColors = {
   gold: '#D5900B',
   notice: '#F5EDE2',
   noticeDanger: 'rgba(245, 233, 226, 0.4)',
+  /** Disabled buttons: a soft filled surface with muted text (any variant). */
+  disabledSurface: '#E7E0D2',
+  disabledText: '#9A8B73',
 } as const;
 
 export const timelineColors = {
