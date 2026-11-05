@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Image,
   Pressable,
@@ -15,14 +16,18 @@ import {
   SearchBar,
   SectionHeader,
 } from '../components/dashboard/DashboardShell';
-import { ChangeLocationModal } from '../components/dashboard/ChangeLocationModal';
+import {
+  ChangeLocationModal,
+  type DashboardLocationSelection,
+} from '../components/dashboard/ChangeLocationModal';
+import { getCurrentLocation } from '../services/location';
 import { DashboardBookingsSection } from '../components/dashboard/DashboardBookingsSection';
 import { DashboardArtisanRail } from '../components/dashboard/DashboardArtisanRail';
 import { WhyBetaWorkSection } from '../components/dashboard/WhyBetaWorkSection';
 import { RECENTLY_VIEWED_ARTISANS, type Artisan } from '../data/artisans';
 import { ARTISAN_SERVICES } from '../data/artisanServices';
 import { type Booking } from '../data/bookings';
-import { DEFAULT_LOCATION_LABEL, type SavedAddress } from '../data/locations';
+import { DEFAULT_LOCATION_LABEL } from '../data/locations';
 import { useAuthNavigation, useClientTabNavigation } from '../navigation/types';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
@@ -65,9 +70,27 @@ export function UserDashboardScreen() {
   const handleSelectArtisan = (artisan: Artisan) =>
     authNavigation.navigate('ArtisanProfile', { artisanId: artisan.id });
 
-  const handleSelectLocation = (address: SavedAddress) => {
-    setLocation(address.label);
+  // The resolved coordinates aren't consumed on the dashboard yet (the nearby
+  // list uses a placeholder distance); we surface the chosen label for now.
+  const handleSelectLocation = (selection: DashboardLocationSelection) => {
+    setLocation(selection.label);
     setLocationPickerOpen(false);
+  };
+
+  const handleUseCurrentLocation = async () => {
+    try {
+      await getCurrentLocation();
+      setLocation('Current location');
+    } catch (error) {
+      Alert.alert(
+        'Location unavailable',
+        error instanceof Error
+          ? error.message
+          : 'Could not get your current location.',
+      );
+    } finally {
+      setLocationPickerOpen(false);
+    }
   };
 
   const openBookings = () => tabNavigation.navigate('bookings');
@@ -172,6 +195,7 @@ export function UserDashboardScreen() {
       <ChangeLocationModal
         onClose={() => setLocationPickerOpen(false)}
         onSelect={handleSelectLocation}
+        onUseCurrentLocation={handleUseCurrentLocation}
         visible={isLocationPickerOpen}
       />
     </DashboardShell>
