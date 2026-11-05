@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { saveAddress } from '../../api/addresses';
 import { captureCurrentLocation } from '../../services/geocoding';
 
 import { BookingArtisanCard } from '../../components/bookings/BookingArtisanCard';
@@ -85,6 +86,9 @@ export function BookServiceScreen({
         longitude: place.longitude,
         location: place.address || 'Current location',
       });
+      if (place.address) {
+        saveAddress(place).catch(() => {});
+      }
     } catch (error) {
       Alert.alert(
         'Location unavailable',
@@ -321,7 +325,6 @@ export function BookServiceScreen({
           update({ location: address, latitude, longitude });
           setLocationOpen(false);
         }}
-        onUseCurrentLocation={applyCurrentLocation}
         visible={isLocationOpen}
       />
     </View>
