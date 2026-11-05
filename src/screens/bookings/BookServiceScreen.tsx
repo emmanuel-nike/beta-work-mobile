@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { getCurrentLocation } from '../../services/location';
+import { captureCurrentLocation } from '../../services/geocoding';
 
 import { BookingArtisanCard } from '../../components/bookings/BookingArtisanCard';
 import { DateTimeModal } from '../../components/bookings/DateTimeModal';
@@ -79,11 +79,11 @@ export function BookServiceScreen({
     }
     setLocating(true);
     try {
-      const coords = await getCurrentLocation();
+      const place = await captureCurrentLocation();
       update({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        location: 'Current location',
+        latitude: place.latitude,
+        longitude: place.longitude,
+        location: place.address || 'Current location',
       });
     } catch (error) {
       Alert.alert(

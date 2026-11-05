@@ -9,7 +9,7 @@ import {
   ChangeLocationModal,
   type DashboardLocationSelection,
 } from '../components/dashboard/ChangeLocationModal';
-import { getCurrentLocation } from '../services/location';
+import { captureCurrentLocation } from '../services/geocoding';
 import {
   DashboardCard,
   DashboardHeader,
@@ -73,8 +73,8 @@ export function ArtisanDashboardScreen({
 
   const handleUseCurrentLocation = async () => {
     try {
-      await getCurrentLocation();
-      setLocation('Current location');
+      const place = await captureCurrentLocation();
+      setLocation(place.address || 'Current location');
     } catch (error) {
       Alert.alert(
         'Location unavailable',

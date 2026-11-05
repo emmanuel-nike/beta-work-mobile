@@ -20,7 +20,7 @@ import {
   ChangeLocationModal,
   type DashboardLocationSelection,
 } from '../components/dashboard/ChangeLocationModal';
-import { getCurrentLocation } from '../services/location';
+import { captureCurrentLocation } from '../services/geocoding';
 import { DashboardBookingsSection } from '../components/dashboard/DashboardBookingsSection';
 import { DashboardArtisanRail } from '../components/dashboard/DashboardArtisanRail';
 import { WhyBetaWorkSection } from '../components/dashboard/WhyBetaWorkSection';
@@ -79,8 +79,8 @@ export function UserDashboardScreen() {
 
   const handleUseCurrentLocation = async () => {
     try {
-      await getCurrentLocation();
-      setLocation('Current location');
+      const place = await captureCurrentLocation();
+      setLocation(place.address || 'Current location');
     } catch (error) {
       Alert.alert(
         'Location unavailable',
