@@ -9,7 +9,16 @@ export type BookingStatus =
 
 export type BookingFilter = 'all' | BookingStatus;
 
-export type TimelineState = 'done' | 'active' | 'pending' | 'cancelled';
+/**
+ * Stage states, least to most progressed: `inactive` (not reached), `pending`
+ * (reached, awaiting activation), `active` (in progress), `done`, `cancelled`.
+ */
+export type TimelineState =
+  | 'inactive'
+  | 'pending'
+  | 'active'
+  | 'done'
+  | 'cancelled';
 
 export type TimelineStep = Readonly<{
   id: string;
@@ -124,9 +133,9 @@ export const BOOKINGS: readonly Booking[] = [
     timeline: buildTimeline([
       { state: 'done', date: '12th Nov, 2025', time: '08:32 AM' },
       { state: 'active' },
-      { state: 'pending' },
-      { state: 'pending' },
-      { state: 'pending' },
+      { state: 'inactive' },
+      { state: 'inactive' },
+      { state: 'inactive' },
     ]),
   },
   {
@@ -152,8 +161,8 @@ export const BOOKINGS: readonly Booking[] = [
       { state: 'done', date: '12th Nov, 2025', time: '08:32 AM' },
       { state: 'done', date: '12th Nov, 2025', time: '12:00 PM' },
       { state: 'done', date: '12th Nov, 2025', time: '4:03 PM' },
-      { state: 'pending' },
-      { state: 'pending' },
+      { state: 'inactive' },
+      { state: 'inactive' },
     ]),
   },
   {
@@ -206,8 +215,8 @@ export const BOOKINGS: readonly Booking[] = [
       { state: 'done', date: '12th Nov, 2025', time: '08:32 AM' },
       { state: 'done', date: '12th Nov, 2025', time: '12:00 PM' },
       { state: 'cancelled', date: '12th Nov, 2025', time: '6:00 PM' },
-      { state: 'pending' },
-      { state: 'pending' },
+      { state: 'inactive' },
+      { state: 'inactive' },
     ]),
     cancellation: {
       cancelledBy: 'Tunde',
@@ -239,7 +248,7 @@ export const BOOKINGS: readonly Booking[] = [
       { state: 'done', date: '12th Nov, 2025', time: '12:00 PM' },
       { state: 'done', date: '12th Nov, 2025', time: '4:03 PM' },
       { state: 'active' },
-      { state: 'pending' },
+      { state: 'inactive' },
     ]),
   },
   {
