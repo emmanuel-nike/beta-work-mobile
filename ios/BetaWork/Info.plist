@@ -36,7 +36,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Beta Work needs camera access so you can take a profile photo.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>Beta Work uses your location to set the service address for a booking.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Beta Work needs photo library access so you can choose a profile photo.</string>
 	<key>RCTNewArchEnabled</key>

@@ -42,6 +42,9 @@ export type Booking = Readonly<{
   location: string;
   /** Full address used on the details screen. */
   address: string;
+  /** GPS coordinates of the service location, when captured. */
+  latitude?: number | null;
+  longitude?: number | null;
   service: string;
   languages: string;
   jobDescription: string;

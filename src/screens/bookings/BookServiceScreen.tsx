@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -10,6 +12,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { getCurrentLocation } from '../../services/location';
 
 import { BookingArtisanCard } from '../../components/bookings/BookingArtisanCard';
 import { DateTimeModal } from '../../components/bookings/DateTimeModal';
@@ -62,9 +66,37 @@ export function BookServiceScreen({
   const [isServiceOpen, setServiceOpen] = useState(false);
   const [isDateOpen, setDateOpen] = useState(false);
   const [isLocationOpen, setLocationOpen] = useState(false);
+  const [isLocating, setLocating] = useState(false);
 
   const update = (patch: Partial<BookingDraft>) =>
     setDraft(current => ({ ...current, ...patch }));
+
+  // Trigger the device GPS permission + read the current position, then store
+  // the coordinates on the draft so they travel with the booking.
+  const applyCurrentLocation = async () => {
+    if (isLocating) {
+      return;
+    }
+    setLocating(true);
+    try {
+      const coords = await getCurrentLocation();
+      update({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        location: 'Current location',
+      });
+    } catch (error) {
+      Alert.alert(
+        'Location unavailable',
+        error instanceof Error
+          ? error.message
+          : 'Could not get your current location.',
+      );
+    } finally {
+      setLocating(false);
+      setLocationOpen(false);
+    }
+  };
 
   const canReview =
     Boolean(draft.serviceId) &&
@@ -179,14 +211,21 @@ export function BookServiceScreen({
             </Pressable>
             <Pressable
               accessibilityRole="button"
+              disabled={isLocating}
               hitSlop={6}
-              onPress={() => update({ location: 'Current location, Abuja' })}
+              onPress={applyCurrentLocation}
               style={({ pressed }) => [
                 styles.currentLink,
                 pressed && styles.pressed,
               ]}>
-              <CurrentLocationIcon color={ACCENT} size={16} />
-              <Text style={styles.currentLinkLabel}>Use your current location</Text>
+              {isLocating ? (
+                <ActivityIndicator color={ACCENT} size="small" />
+              ) : (
+                <CurrentLocationIcon color={ACCENT} size={16} />
+              )}
+              <Text style={styles.currentLinkLabel}>
+                {isLocating ? 'Getting your location…' : 'Use your current location'}
+              </Text>
             </Pressable>
           </Field>
 
@@ -278,10 +317,11 @@ export function BookServiceScreen({
       <ServiceLocationModal
         initialValue={draft.location}
         onClose={() => setLocationOpen(false)}
-        onSelect={location => {
-          update({ location });
+        onSelect={({ address, latitude, longitude }) => {
+          update({ location: address, latitude, longitude });
           setLocationOpen(false);
         }}
+        onUseCurrentLocation={applyCurrentLocation}
         visible={isLocationOpen}
       />
     </View>

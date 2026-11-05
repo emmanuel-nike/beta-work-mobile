@@ -60,6 +60,8 @@ export function ReviewBookingScreen({
       jobDescription: draft.jobDescription.trim(),
       scheduledAt: bookingScheduledAtIso(draft),
       location: draft.location.trim() || null,
+      latitude: draft.latitude,
+      longitude: draft.longitude,
       budget: draft.budget ? Number(draft.budget) : null,
       messageToArtisan: draft.message.trim() || null,
     };

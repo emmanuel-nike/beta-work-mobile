@@ -25,6 +25,8 @@ type ApiBooking = Readonly<{
   scheduledAt: string | null;
   location: string | null;
   address: string | null;
+  latitude: number | null;
+  longitude: number | null;
   awaitingConfirmation: boolean;
   cancelledBy: string | null;
   cancellationReason: string | null;
@@ -58,6 +60,9 @@ export type CreateBookingInput = Readonly<{
   /** ISO timestamp of the requested slot, or null when unset. */
   scheduledAt: string | null;
   location: string | null;
+  /** GPS coordinates of the service location, when captured. */
+  latitude: number | null;
+  longitude: number | null;
   budget: number | null;
   messageToArtisan: string | null;
 }>;
@@ -229,6 +234,8 @@ function toBooking(api: ApiBooking): Booking {
     scheduledAtIso: api.scheduledAt,
     location: api.location ?? '',
     address: api.address ?? '',
+    latitude: api.latitude,
+    longitude: api.longitude,
     service: api.service,
     languages: api.languages ?? '',
     jobDescription: api.jobDescription ?? '',

@@ -16,6 +16,9 @@ export type BookingDraft = {
   dateIso: string | null;
   time: string | null;
   location: string;
+  /** GPS coordinates for the service location, when captured. */
+  latitude: number | null;
+  longitude: number | null;
   /** Digits only, "" when left blank. */
   budget: string;
   message: string;
@@ -30,6 +33,8 @@ export function createEmptyBookingDraft(): BookingDraft {
     dateIso: null,
     time: null,
     location: '',
+    latitude: null,
+    longitude: null,
     budget: '',
     message: '',
   };
@@ -45,6 +50,8 @@ export function bookingDraftFromBooking(booking: Booking): BookingDraft {
   draft.serviceLabel = booking.service || null;
   draft.jobDescription = booking.jobDescription ?? '';
   draft.location = booking.location || booking.address || '';
+  draft.latitude = booking.latitude ?? null;
+  draft.longitude = booking.longitude ?? null;
   draft.budget = (booking.budget ?? '').replace(/[^\d]/g, '');
   draft.message = booking.messageToArtisan ?? '';
 
