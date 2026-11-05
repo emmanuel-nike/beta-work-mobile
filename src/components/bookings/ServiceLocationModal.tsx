@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -10,6 +12,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CloseIcon, CurrentLocationIcon, MapPinIcon, SearchIcon } from '../icons';
+import {
+  autocompleteAddress,
+  newSessionToken,
+  resolvePlace,
+  type AddressPrediction,
+} from '../../services/geocoding';
 
 const SURFACE = '#FBF6EC';
 const FIELD_BORDER = '#A99F8E';
@@ -25,14 +33,20 @@ const RECENT_LOCATIONS = [
   'Wuse Market, Wuse 2, Abuja',
 ];
 
-/** The current device location, stubbed until geolocation is wired up. */
-const CURRENT_LOCATION = 'Current location, Abuja';
+/** A chosen service location; coordinates are present when geocoded. */
+export type SelectedLocation = Readonly<{
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+}>;
 
 type ServiceLocationModalProps = Readonly<{
   visible: boolean;
   initialValue?: string;
   onClose: () => void;
-  onSelect: (location: string) => void;
+  onSelect: (location: SelectedLocation) => void;
+  /** Capture the device's GPS position as the service location. */
+  onUseCurrentLocation: () => void;
 }>;
 
 export function ServiceLocationModal({
@@ -40,23 +54,96 @@ export function ServiceLocationModal({
   initialValue,
   onClose,
   onSelect,
+  onUseCurrentLocation,
 }: ServiceLocationModalProps) {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState(initialValue ?? '');
+  const [predictions, setPredictions] = useState<AddressPrediction[]>([]);
+  const [isSearching, setSearching] = useState(false);
+  const [isResolving, setResolving] = useState(false);
+  const sessionToken = useRef(newSessionToken());
 
   useEffect(() => {
     if (visible) {
       setQuery(initialValue ?? '');
+      setPredictions([]);
+      sessionToken.current = newSessionToken();
     }
   }, [initialValue, visible]);
 
-  const confirm = (value: string) => {
-    const trimmed = value.trim();
-    if (trimmed.length === 0) {
+  // Debounced address autocomplete (Google Places via our backend).
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!visible || trimmed.length < 3) {
+      setPredictions([]);
+      setSearching(false);
       return;
     }
-    onSelect(trimmed);
+    setSearching(true);
+    let cancelled = false;
+    const handle = setTimeout(async () => {
+      try {
+        const results = await autocompleteAddress(trimmed, sessionToken.current);
+        if (!cancelled) {
+          setPredictions(results);
+        }
+      } catch {
+        if (!cancelled) {
+          setPredictions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setSearching(false);
+        }
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [query, visible]);
+
+  const selectPrediction = async (prediction: AddressPrediction) => {
+    if (isResolving) {
+      return;
+    }
+    setResolving(true);
+    try {
+      const place = await resolvePlace(prediction.placeId, sessionToken.current);
+      onSelect({
+        address: place.address || prediction.description,
+        latitude: place.latitude,
+        longitude: place.longitude,
+      });
+    } catch {
+      // Keep the chosen text even if coordinates couldn't be resolved.
+      onSelect({
+        address: prediction.description,
+        latitude: null,
+        longitude: null,
+      });
+    } finally {
+      setResolving(false);
+      // A session ends once details are fetched; start a fresh one.
+      sessionToken.current = newSessionToken();
+    }
   };
+
+  // "Use this address": prefer the top match (with coordinates); otherwise keep
+  // the typed text without coordinates.
+  const confirm = async () => {
+    const trimmed = query.trim();
+    if (trimmed.length === 0 || isResolving) {
+      return;
+    }
+    if (predictions.length > 0) {
+      await selectPrediction(predictions[0]);
+      return;
+    }
+    onSelect({ address: trimmed, latitude: null, longitude: null });
+  };
+
+  const showPredictions = query.trim().length >= 3;
 
   return (
     <Modal
@@ -94,16 +181,17 @@ export function ServiceLocationModal({
               onChangeText={setQuery}
               placeholder="Search or enter address"
               placeholderTextColor={MUTED}
-              returnKeyType="done"
-              onSubmitEditing={() => confirm(query)}
+              returnKeyType="search"
+              onSubmitEditing={confirm}
               style={styles.searchInput}
               value={query}
             />
+            {isSearching ? <ActivityIndicator color={MUTED} size="small" /> : null}
           </View>
 
           <Pressable
             accessibilityRole="button"
-            onPress={() => confirm(CURRENT_LOCATION)}
+            onPress={onUseCurrentLocation}
             style={({ pressed }) => [
               styles.currentLocation,
               pressed && styles.pressed,
@@ -116,32 +204,69 @@ export function ServiceLocationModal({
 
           <View style={styles.divider} />
 
-          <Text style={styles.sectionLabel}>Recent locations</Text>
-          {RECENT_LOCATIONS.map(location => (
-            <Pressable
-              accessibilityRole="button"
-              key={location}
-              onPress={() => setQuery(location)}
-              style={({ pressed }) => [styles.recentRow, pressed && styles.pressed]}>
-              <MapPinIcon color={MUTED} size={16} />
-              <Text numberOfLines={1} style={styles.recentLabel}>
-                {location}
-              </Text>
-            </Pressable>
-          ))}
+          {showPredictions ? (
+            <>
+              <Text style={styles.sectionLabel}>Suggestions</Text>
+              {!isSearching && predictions.length === 0 ? (
+                <Text style={styles.empty}>No matching addresses.</Text>
+              ) : null}
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                style={styles.results}>
+                {predictions.map(prediction => (
+                  <Pressable
+                    accessibilityRole="button"
+                    key={prediction.placeId}
+                    onPress={() => selectPrediction(prediction)}
+                    style={({ pressed }) => [
+                      styles.recentRow,
+                      pressed && styles.pressed,
+                    ]}>
+                    <MapPinIcon color={MUTED} size={16} />
+                    <Text numberOfLines={2} style={styles.recentLabel}>
+                      {prediction.description}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </>
+          ) : (
+            <>
+              <Text style={styles.sectionLabel}>Recent locations</Text>
+              {RECENT_LOCATIONS.map(location => (
+                <Pressable
+                  accessibilityRole="button"
+                  key={location}
+                  onPress={() => setQuery(location)}
+                  style={({ pressed }) => [
+                    styles.recentRow,
+                    pressed && styles.pressed,
+                  ]}>
+                  <MapPinIcon color={MUTED} size={16} />
+                  <Text numberOfLines={1} style={styles.recentLabel}>
+                    {location}
+                  </Text>
+                </Pressable>
+              ))}
+            </>
+          )}
 
           <View style={styles.divider} />
 
           <Pressable
             accessibilityRole="button"
-            disabled={query.trim().length === 0}
-            onPress={() => confirm(query)}
+            disabled={query.trim().length === 0 || isResolving}
+            onPress={confirm}
             style={({ pressed }) => [
               styles.confirm,
-              query.trim().length === 0 && styles.confirmDisabled,
+              (query.trim().length === 0 || isResolving) && styles.confirmDisabled,
               pressed && styles.pressed,
             ]}>
-            <Text style={styles.confirmLabel}>Use this location</Text>
+            {isResolving ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.confirmLabel}>Use this address</Text>
+            )}
           </Pressable>
         </View>
       </View>
@@ -238,6 +363,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 20,
     marginBottom: 6,
+  },
+  empty: {
+    color: MUTED,
+    fontSize: 13,
+    lineHeight: 18,
+    paddingVertical: 8,
+  },
+  results: {
+    maxHeight: 220,
   },
   recentRow: {
     alignItems: 'center',

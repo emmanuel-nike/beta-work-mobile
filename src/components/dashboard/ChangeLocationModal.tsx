@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -11,6 +12,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RECENT_ADDRESSES, type SavedAddress } from '../../data/locations';
+import {
+  autocompleteAddress,
+  newSessionToken,
+  resolvePlace,
+  type AddressPrediction,
+} from '../../services/geocoding';
 import {
   CloseIcon,
   CurrentLocationIcon,
@@ -28,10 +35,17 @@ const ADDRESS = '#1B1105';
 const SUBDUED = '#736051';
 const ACCENT = '#0F6743';
 
+/** A chosen location; coordinates are present when resolved via geocoding. */
+export type DashboardLocationSelection = Readonly<{
+  label: string;
+  latitude: number | null;
+  longitude: number | null;
+}>;
+
 type ChangeLocationModalProps = Readonly<{
   visible: boolean;
   onClose: () => void;
-  onSelect: (address: SavedAddress) => void;
+  onSelect: (location: DashboardLocationSelection) => void;
   onUseCurrentLocation?: () => void;
   onEditAddress?: (address: SavedAddress) => void;
 }>;
@@ -45,19 +59,84 @@ export function ChangeLocationModal({
 }: ChangeLocationModalProps) {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
+  const [predictions, setPredictions] = useState<AddressPrediction[]>([]);
+  const [isSearching, setSearching] = useState(false);
+  const [isResolving, setResolving] = useState(false);
+  const sessionToken = useRef(newSessionToken());
 
-  const results = useMemo(() => {
+  useEffect(() => {
+    if (visible) {
+      setQuery('');
+      setPredictions([]);
+      sessionToken.current = newSessionToken();
+    }
+  }, [visible]);
+
+  // Debounced address autocomplete (Google Places via our backend).
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!visible || trimmed.length < 3) {
+      setPredictions([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    let cancelled = false;
+    const handle = setTimeout(async () => {
+      try {
+        const results = await autocompleteAddress(trimmed, sessionToken.current);
+        if (!cancelled) {
+          setPredictions(results);
+        }
+      } catch {
+        if (!cancelled) {
+          setPredictions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setSearching(false);
+        }
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [query, visible]);
+
+  const selectPrediction = async (prediction: AddressPrediction) => {
+    if (isResolving) {
+      return;
+    }
+    setResolving(true);
+    try {
+      const place = await resolvePlace(prediction.placeId, sessionToken.current);
+      onSelect({
+        label: place.address || prediction.description,
+        latitude: place.latitude,
+        longitude: place.longitude,
+      });
+    } catch {
+      onSelect({ label: prediction.description, latitude: null, longitude: null });
+    } finally {
+      setResolving(false);
+      sessionToken.current = newSessionToken();
+    }
+  };
+
+  const savedMatches = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (needle.length === 0) {
       return RECENT_ADDRESSES;
     }
-
     return RECENT_ADDRESSES.filter(
       item =>
         item.address.toLowerCase().includes(needle) ||
         item.area.toLowerCase().includes(needle),
     );
   }, [query]);
+
+  const showPredictions = query.trim().length >= 3;
 
   return (
     <Modal
@@ -91,6 +170,9 @@ export function ChangeLocationModal({
             style={styles.searchInput}
             value={query}
           />
+          {isSearching || isResolving ? (
+            <ActivityIndicator color={SUBDUED} size="small" />
+          ) : null}
         </View>
 
         <Pressable
@@ -104,49 +186,77 @@ export function ChangeLocationModal({
 
         <View style={styles.divider} />
 
-        <Text style={styles.sectionTitle}>Recent addresses</Text>
+        <Text style={styles.sectionTitle}>
+          {showPredictions ? 'Search results' : 'Recent addresses'}
+        </Text>
 
         <ScrollView
           contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {results.map(address => (
-            <View key={address.id} style={styles.addressRow}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => onSelect(address)}
-                style={({ pressed }) => [
-                  styles.addressMain,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <View style={styles.pin}>
-                  <MapPinIcon />
-                </View>
-                <View style={styles.addressCopy}>
-                  <Text style={styles.addressText}>{address.address}</Text>
-                  <Text style={styles.areaText}>{address.area}</Text>
-                </View>
-              </Pressable>
+          {showPredictions ? (
+            <>
+              {predictions.map(prediction => (
+                <Pressable
+                  accessibilityRole="button"
+                  key={prediction.placeId}
+                  onPress={() => selectPrediction(prediction)}
+                  style={({ pressed }) => [
+                    styles.addressRow,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <View style={styles.pin}>
+                    <MapPinIcon />
+                  </View>
+                  <Text style={styles.addressText}>{prediction.description}</Text>
+                </Pressable>
+              ))}
+              {!isSearching && predictions.length === 0 ? (
+                <Text style={styles.noResults}>
+                  No addresses match “{query.trim()}”.
+                </Text>
+              ) : null}
+            </>
+          ) : (
+            savedMatches.map(address => (
+              <View key={address.id} style={styles.addressRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() =>
+                    onSelect({
+                      label: address.label,
+                      latitude: null,
+                      longitude: null,
+                    })
+                  }
+                  style={({ pressed }) => [
+                    styles.addressMain,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <View style={styles.pin}>
+                    <MapPinIcon />
+                  </View>
+                  <View style={styles.addressCopy}>
+                    <Text style={styles.addressText}>{address.address}</Text>
+                    <Text style={styles.areaText}>{address.area}</Text>
+                  </View>
+                </Pressable>
 
-              <Pressable
-                accessibilityLabel={`Edit ${address.area}`}
-                accessibilityRole="button"
-                hitSlop={10}
-                onPress={() => onEditAddress?.(address)}
-                style={({ pressed }) => pressed && styles.pressed}
-              >
-                <EditIcon />
-              </Pressable>
-            </View>
-          ))}
-
-          {results.length === 0 ? (
-            <Text style={styles.noResults}>
-              No saved address matches “{query.trim()}”.
-            </Text>
-          ) : null}
+                <Pressable
+                  accessibilityLabel={`Edit ${address.area}`}
+                  accessibilityRole="button"
+                  hitSlop={10}
+                  onPress={() => onEditAddress?.(address)}
+                  style={({ pressed }) => pressed && styles.pressed}
+                >
+                  <EditIcon />
+                </Pressable>
+              </View>
+            ))
+          )}
         </ScrollView>
       </View>
     </Modal>
@@ -244,6 +354,7 @@ const styles = StyleSheet.create({
   },
   addressText: {
     color: ADDRESS,
+    flex: 1,
     fontSize: 14,
     lineHeight: 20,
   },
