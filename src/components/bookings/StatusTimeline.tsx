@@ -16,6 +16,7 @@ const DOT_COLORS: Record<TimelineState, string> = {
   done: timelineColors.done,
   active: timelineColors.active,
   pending: timelineColors.pending,
+  inactive: timelineColors.inactive,
   cancelled: timelineColors.cancelled,
 };
 
@@ -28,7 +29,8 @@ export function StatusTimeline({ steps }: StatusTimelineProps) {
     <View style={styles.container}>
       {steps.map((step, index) => {
         const isLast = index === steps.length - 1;
-        const isMuted = step.state === 'pending';
+        // Not-yet-reached stages read as muted; reached/active ones do not.
+        const isMuted = step.state === 'inactive';
 
         return (
           <View key={step.id} style={styles.row}>
@@ -38,6 +40,7 @@ export function StatusTimeline({ steps }: StatusTimelineProps) {
                   styles.dot,
                   step.state === 'active' && styles.dotActive,
                   step.state === 'pending' && styles.dotPending,
+                  step.state === 'inactive' && styles.dotInactive,
                   step.state === 'done' && {
                     backgroundColor: DOT_COLORS.done,
                   },
@@ -56,6 +59,7 @@ export function StatusTimeline({ steps }: StatusTimelineProps) {
                   style={[
                     styles.track,
                     step.state === 'done' && styles.trackDone,
+                    step.state === 'pending' && styles.trackPending,
                   ]}
                 />
               )}
@@ -68,6 +72,7 @@ export function StatusTimeline({ steps }: StatusTimelineProps) {
                     styles.label,
                     isMuted && styles.labelMuted,
                     step.state === 'active' && styles.labelActive,
+                    step.state === 'pending' && styles.labelPending,
                     step.state === 'cancelled' && styles.labelCancelled,
                   ]}
                 >
@@ -75,7 +80,9 @@ export function StatusTimeline({ steps }: StatusTimelineProps) {
                 </Text>
                 <Text style={styles.date}>{timestamp(step)}</Text>
               </View>
-              {step.detail ? <Text style={styles.time}>{step.detail}</Text> : null}
+              {step.detail ? (
+                <Text style={styles.time}>{step.detail}</Text>
+              ) : null}
             </View>
           </View>
         );
@@ -103,22 +110,31 @@ const styles = StyleSheet.create({
     height: DOT_SIZE,
     justifyContent: 'center',
     width: DOT_SIZE,
+    marginHorizontal: 20,
   },
   dotActive: {
     borderColor: timelineColors.active,
     borderWidth: 2,
   },
   dotPending: {
-    borderColor: timelineColors.pending,
+    backgroundColor: timelineColors.pending,
+  },
+  dotInactive: {
+    borderColor: timelineColors.inactive,
     borderWidth: 2,
   },
   track: {
     backgroundColor: timelineColors.track,
     flex: 1,
     width: 2,
+    marginTop: 4,
+    marginBottom: 4,
   },
   trackDone: {
     backgroundColor: timelineColors.done,
+  },
+  trackPending: {
+    backgroundColor: timelineColors.pending,
   },
   content: {
     flex: 1,
@@ -145,6 +161,9 @@ const styles = StyleSheet.create({
   },
   labelActive: {
     color: timelineColors.active,
+  },
+  labelPending: {
+    color: timelineColors.pending,
   },
   labelCancelled: {
     color: timelineColors.cancelled,

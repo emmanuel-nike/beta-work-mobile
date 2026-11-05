@@ -12,6 +12,16 @@ import { apiRequest } from './client';
 /** Shown until the artisan's photo loads (or when they have none). */
 const FALLBACK_AVATAR: ImageSourcePropType = require('../../assets/images/dashboard/image0_1174_145674.png');
 
+/** One status-timeline stage as returned by the API. */
+type ApiTimelineStep = Readonly<{
+  key: string;
+  label: string;
+  state: TimelineState;
+  detail: string;
+  /** ISO timestamp for the stage event, when known. */
+  at: string | null;
+}>;
+
 /** The booking shape returned by `GET /api/v1/bookings`. */
 type ApiBooking = Readonly<{
   id: number;
@@ -32,6 +42,8 @@ type ApiBooking = Readonly<{
   cancellationReason: string | null;
   cancelledAt: string | null;
   createdAt: string | null;
+  /** Status timeline built by the backend; absent on older responses. */
+  timeline?: readonly ApiTimelineStep[];
   artisan: Readonly<{
     id: number;
     name: string | null;
@@ -152,10 +164,23 @@ const STEP_LABELS = [
   'Job completed',
 ] as const;
 
+/** Map the backend-provided status timeline to the UI step shape. */
+function timelineFromApi(
+  steps: readonly ApiTimelineStep[],
+): readonly TimelineStep[] {
+  return steps.map(step => ({
+    id: step.key,
+    label: step.label,
+    state: step.state,
+    detail: step.detail || undefined,
+    ...stepStamp(step.at),
+  }));
+}
+
 /**
- * Derive the 5-step progress timeline from the booking's status. The backend
- * stores status (and cancellation), and the client renders the stepper, so the
- * per-step states are reconstructed here to match the existing UI.
+ * Fallback timeline reconstruction for responses without a `timeline` (older
+ * backends). Derives the 5 per-step states from the booking status to match the
+ * existing UI; the backend is otherwise the source of truth via timelineFromApi.
  */
 function timelineForStatus(api: ApiBooking): readonly TimelineStep[] {
   const states = stepStates(api);
@@ -199,19 +224,19 @@ function stepStamp(iso: string | null): { date?: string; time?: string } {
 function stepStates(api: ApiBooking): TimelineState[] {
   switch (api.status) {
     case 'pending':
-      return ['done', 'active', 'pending', 'pending', 'pending'];
+      return ['done', 'pending', 'inactive', 'inactive', 'inactive'];
     case 'accepted':
-      return ['done', 'done', 'done', 'pending', 'pending'];
+      return ['done', 'done', 'done', 'pending', 'inactive'];
     case 'ongoing':
       return api.awaitingConfirmation
-        ? ['done', 'done', 'done', 'done', 'active']
-        : ['done', 'done', 'done', 'active', 'pending'];
+        ? ['done', 'done', 'done', 'done', 'pending']
+        : ['done', 'done', 'done', 'active', 'inactive'];
     case 'completed':
       return ['done', 'done', 'done', 'done', 'done'];
     case 'cancelled':
-      return ['done', 'done', 'cancelled', 'pending', 'pending'];
+      return ['done', 'done', 'cancelled', 'inactive', 'inactive'];
     default:
-      return ['pending', 'pending', 'pending', 'pending', 'pending'];
+      return ['inactive', 'inactive', 'inactive', 'inactive', 'inactive'];
   }
 }
 
@@ -241,7 +266,9 @@ function toBooking(api: ApiBooking): Booking {
     jobDescription: api.jobDescription ?? '',
     budget: formatBudget(api.budget),
     messageToArtisan: api.messageToArtisan ?? '',
-    timeline: timelineForStatus(api),
+    timeline: api.timeline
+      ? timelineFromApi(api.timeline)
+      : timelineForStatus(api),
     awaitingConfirmation: api.awaitingConfirmation || undefined,
     cancellation:
       api.status === 'cancelled' && api.cancelledBy

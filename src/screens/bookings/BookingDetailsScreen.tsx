@@ -409,8 +409,7 @@ function statusLabel(status: BookingStatus): string {
 function presentTimeline(booking: Booking): readonly TimelineStep[] {
   const firstName = booking.artisanName.split(' ')[0] || 'the artisan';
   const accepted = booking.timeline.find(step => step.id === 'job-accepted');
-  const ongoing = booking.timeline.find(step => step.id === 'job-ongoing');
-  const scheduledState = scheduledStepState(booking.status, accepted, ongoing);
+  const scheduledState = scheduledStepState(accepted);
 
   return booking.timeline.flatMap(step => {
     const described = {
@@ -421,7 +420,7 @@ function presentTimeline(booking: Booking): readonly TimelineStep[] {
     if (step.id !== 'job-accepted') {
       return [described];
     }
-    const stamped = scheduledState === 'done' || scheduledState === 'active';
+    const stamped = scheduledState === 'done';
     const scheduled: TimelineStep = {
       id: 'job-scheduled',
       label: 'Job scheduled',
@@ -434,18 +433,9 @@ function presentTimeline(booking: Booking): readonly TimelineStep[] {
   });
 }
 
-function scheduledStepState(
-  status: BookingStatus,
-  accepted: TimelineStep | undefined,
-  ongoing: TimelineStep | undefined,
-): TimelineState {
-  if (!accepted || accepted.state !== 'done') {
-    return 'pending';
-  }
-  if (ongoing?.state === 'pending') {
-    return status === 'accepted' ? 'active' : 'done';
-  }
-  return 'done';
+function scheduledStepState(accepted: TimelineStep | undefined): TimelineState {
+  // Scheduling completes once the artisan accepts; before that it's not reached.
+  return accepted?.state === 'done' ? 'done' : 'inactive';
 }
 
 function stepDetail(
