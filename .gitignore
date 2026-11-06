@@ -78,3 +78,18 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+Figma_Exports/Client_Artisan_Bookings/Cancelled bookings.svg
+Figma_Exports/Client_Artisan_Bookings/Completed bookings.svg
+Figma_Exports/Client_Artisan_Bookings/Ongoing bookings.svg
+Figma_Exports/Client_Artisan_Bookings/Pending bookings.svg
+Figma_Exports/Client_Artisan_Bookings_Old/1-My Bookings empty state.svg
+Figma_Exports/Client_Artisan_Bookings_Old/1-My Bookings.svg
+Figma_Exports/Client_Artisan_Bookings_Old/2-View pending bookings.svg
+Figma_Exports/Client_Artisan_Bookings_Old/3-View ongoing bookings-1.svg
+Figma_Exports/Client_Artisan_Bookings_Old/3-View ongoing bookings.svg
+Figma_Exports/Client_Artisan_Bookings_Old/4-View Completed bookings.svg
+Figma_Exports/Client_Artisan_Bookings_Old/5-View cancelled bookings.svg
+Figma_Exports/Client_Artisan_Bookings_Old/6-Raise a dispute.svg
+Figma_Exports/Client_Artisan_Bookings_Old/Feedback.svg
+Figma_Exports/Client_Artisan_Bookings_Old/Success Modal.svg
+Figma_Exports/*
