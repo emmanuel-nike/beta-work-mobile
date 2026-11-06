@@ -44,6 +44,24 @@ export async function fetchMyJobs(): Promise<ArtisanJob[]> {
   return data.map(toArtisanJob)
 }
 
+/** Accept a pending job assigned to the authenticated artisan. */
+export async function acceptJob(id: string): Promise<ArtisanJob> {
+  const { job } = await apiRequest<{ job: ApiArtisanJob }>(
+    `/artisan/jobs/${encodeURIComponent(id)}/accept`,
+    { method: 'POST' },
+  )
+  return toArtisanJob(job)
+}
+
+/** Decline a pending job. The booking is cancelled for the client. */
+export async function declineJob(id: string): Promise<ArtisanJob> {
+  const { job } = await apiRequest<{ job: ApiArtisanJob }>(
+    `/artisan/jobs/${encodeURIComponent(id)}/decline`,
+    { method: 'POST' },
+  )
+  return toArtisanJob(job)
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 function formatDateTime(iso: string | null): string {
