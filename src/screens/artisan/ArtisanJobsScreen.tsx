@@ -1,6 +1,7 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Pressable,
   ScrollView,
@@ -14,7 +15,6 @@ import { ArtisanJobCard } from '../../components/artisan/ArtisanJobCard';
 import { BookingsHeader } from '../../components/bookings/BookingsHeader';
 import { BriefcaseIcon } from '../../components/icons';
 import {
-  ARTISAN_JOBS,
   JOB_FILTERS,
   JOB_STATUS_LABELS,
   filterJobs,
@@ -22,21 +22,39 @@ import {
   type JobFilter,
 } from '../../data/artisanJobs';
 import { useAuthNavigation } from '../../navigation/types';
-import { useAppSelector } from '../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import {
+  loadMyJobs,
+  selectArtisanJobs,
+  selectArtisanJobsError,
+  selectArtisanJobsStatus,
+} from '../../store/slices/artisanJobsSlice';
 import { selectIsArtisanVerified } from '../../store/slices/authSlice';
 import { dashboardColors } from '../../theme/dashboard';
 
 export function ArtisanJobsScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const navigation = useAuthNavigation();
+  const dispatch = useAppDispatch();
   const isVerified = useAppSelector(selectIsArtisanVerified);
+  const allJobs = useAppSelector(selectArtisanJobs);
+  const loadStatus = useAppSelector(selectArtisanJobsStatus);
+  const loadError = useAppSelector(selectArtisanJobsError);
   const [filter, setFilter] = useState<JobFilter>('all');
 
+  useEffect(() => {
+    if (isVerified) {
+      dispatch(loadMyJobs());
+    }
+  }, [dispatch, isVerified]);
+
   const jobs = useMemo(
-    () => (isVerified ? filterJobs(ARTISAN_JOBS, filter) : []),
-    [filter, isVerified],
+    () => (isVerified ? filterJobs(allJobs, filter) : []),
+    [allJobs, filter, isVerified],
   );
-  const hasAnyJobs = isVerified && ARTISAN_JOBS.length > 0;
+  const hasAnyJobs = isVerified && allJobs.length > 0;
+  const isInitialLoading =
+    isVerified && loadStatus === 'loading' && allJobs.length === 0;
 
   const openJob = (job: ArtisanJob) =>
     navigation.navigate('ArtisanJobDetail', { jobId: job.id });
@@ -73,8 +91,12 @@ export function ArtisanJobsScreen() {
         </ScrollView>
       )}
       <View style={{ flex: 1 }}>
-        {!hasAnyJobs ? (
-          <AllEmptyState />
+        {isInitialLoading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator color={dashboardColors.tabBar} />
+          </View>
+        ) : !hasAnyJobs ? (
+          <AllEmptyState message={loadStatus === 'failed' ? loadError : null} />
         ) : jobs.length === 0 ? (
           <CategoryEmptyState filter={filter} />
         ) : (
@@ -96,16 +118,18 @@ export function ArtisanJobsScreen() {
   );
 }
 
-function AllEmptyState() {
+function AllEmptyState({ message }: Readonly<{ message?: string | null }>) {
   return (
     <View style={styles.allEmpty}>
       <View style={styles.illustrationCircle}>
         <DashboardBookingsEmptyArtwork height={150} width={192} />
       </View>
-      <Text style={styles.emptyTitle}>No bookings yet</Text>
+      <Text style={styles.emptyTitle}>
+        {message ? 'Could not load jobs' : 'No bookings yet'}
+      </Text>
       <Text style={styles.emptyBody}>
-        You currently have no active service requests. Find a verified
-        professional near you!
+        {message ??
+          'You currently have no active service requests. New requests from clients will appear here.'}
       </Text>
     </View>
   );
@@ -168,6 +192,11 @@ const styles = StyleSheet.create({
   listContent: {
     gap: 12,
     paddingHorizontal: 24,
+  },
+  loading: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
   },
   allEmpty: {
     marginTop: 45,

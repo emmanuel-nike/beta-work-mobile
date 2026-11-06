@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 
 import { setAuthToken } from '../api/client';
 import { persistSession } from './authStorage';
+import { artisanJobsReducer } from './slices/artisanJobsSlice';
 import { artisansReducer } from './slices/artisansSlice';
 import { authReducer } from './slices/authSlice';
 import { bookingsReducer } from './slices/bookingsSlice';
@@ -10,6 +11,7 @@ export const store = configureStore({
   reducer: {
     auth: authReducer,
     bookings: bookingsReducer,
+    artisanJobs: artisanJobsReducer,
     artisans: artisansReducer,
   },
 });

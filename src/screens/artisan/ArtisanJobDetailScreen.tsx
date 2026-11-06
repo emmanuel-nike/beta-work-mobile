@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
@@ -29,9 +30,14 @@ import {
   JOB_STATUS_COLORS,
   JOB_STATUS_LABELS,
   JOB_STATUS_TEXT_COLORS,
-  findJob,
   type ArtisanJobStatus,
 } from '../../data/artisanJobs';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import {
+  loadMyJobs,
+  selectArtisanJobById,
+  selectArtisanJobsStatus,
+} from '../../store/slices/artisanJobsSlice';
 import { dashboardColors } from '../../theme/dashboard';
 import type { AuthStackScreenProps } from '../../navigation/types';
 
@@ -47,16 +53,27 @@ export function ArtisanJobDetailScreen({
   route,
 }: AuthStackScreenProps<'ArtisanJobDetail'>) {
   const insets = useSafeAreaInsets();
-  const job = findJob(route.params.jobId);
-  // The detail flips to the accepted view when the artisan accepts.
-  const [status, setStatus] = useState<ArtisanJobStatus | undefined>(
-    job?.status,
+  const dispatch = useAppDispatch();
+  const job = useAppSelector(state =>
+    selectArtisanJobById(state, route.params.jobId),
   );
+  const loadStatus = useAppSelector(selectArtisanJobsStatus);
+  // Local override so accepting still flips the view before the server confirms.
+  const [statusOverride, setStatusOverride] = useState<ArtisanJobStatus | null>(
+    null,
+  );
+  const status = statusOverride ?? job?.status;
+
+  useEffect(() => {
+    if (!job && loadStatus === 'idle') {
+      dispatch(loadMyJobs());
+    }
+  }, [dispatch, job, loadStatus]);
   const [isMenuOpen, setMenuOpen] = useState(false);
 
   const acceptBooking = () => {
     setMenuOpen(false);
-    setStatus('accepted');
+    setStatusOverride('accepted');
   };
   const declineBooking = () => {
     setMenuOpen(false);
@@ -93,6 +110,7 @@ export function ArtisanJobDetailScreen({
         ];
 
   if (!job || !status) {
+    const stillLoading = loadStatus === 'idle' || loadStatus === 'loading';
     return (
       <View style={styles.root}>
         <BookingsHeader
@@ -101,9 +119,13 @@ export function ArtisanJobDetailScreen({
           variant="detail"
         />
         <View style={styles.missing}>
-          <Text style={styles.missingText}>
-            This job is no longer available.
-          </Text>
+          {stillLoading ? (
+            <ActivityIndicator color={dashboardColors.tabBar} />
+          ) : (
+            <Text style={styles.missingText}>
+              This job is no longer available.
+            </Text>
+          )}
         </View>
       </View>
     );
@@ -161,11 +183,13 @@ export function ArtisanJobDetailScreen({
             label="Phone"
             value={job.client.phone}
           />
-          <ContactRow
-            icon={<BuildingIcon color={CONTACT_ICON} size={16} />}
-            label="Landmark"
-            value={job.client.landmark}
-          />
+          {job.client.landmark ? (
+            <ContactRow
+              icon={<BuildingIcon color={CONTACT_ICON} size={16} />}
+              label="Landmark"
+              value={job.client.landmark}
+            />
+          ) : null}
         </View>
 
         <View style={styles.card}>
