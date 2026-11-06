@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
+import { ArtisanJobCard } from '../components/artisan/ArtisanJobCard';
 import { ArtisanStatCard } from '../components/artisan/ArtisanStatCard';
-import { JobRequestCard } from '../components/artisan/JobRequestCard';
 import { ProfileReviewCard } from '../components/artisan/ProfileReviewCard';
 import { UpcomingRequestCard } from '../components/artisan/UpcomingRequestCard';
 import { ChangeLocationModal } from '../components/dashboard/ChangeLocationModal';
@@ -26,25 +28,27 @@ import {
 import { StarIcon2 } from '../components/icons/StarIcon2';
 import {
   ARTISAN_PROFILE_TASKS,
-  ARTISAN_STATS,
   ARTISAN_TESTIMONIALS,
   buildArtisanProfileTasks,
   getProfileCompletionPercent,
   isProfileSetupComplete,
-  NEW_JOB_REQUESTS,
   UPCOMING_REQUESTS,
   type ArtisanProfileTask,
   type ArtisanReview,
-  type JobRequest,
   type UpcomingRequest,
 } from '../data/artisanRequests';
+import type { ArtisanJob } from '../data/artisanJobs';
 import {
   DEFAULT_LOCATION_LABEL,
   formatArea,
   type AddressSelection,
 } from '../data/locations';
-import { useAuthNavigation } from '../navigation/types';
+import {
+  useAuthNavigation,
+  type ArtisanTabParamList,
+} from '../navigation/types';
 import { useAppSelector } from '../store/hooks';
+import { selectArtisanJobs } from '../store/slices/artisanJobsSlice';
 import {
   selectArtisanProfile,
   selectAuthUser,
@@ -176,16 +180,36 @@ function ApprovedDashboard({
   onLocationPress: () => void;
 }>) {
   const navigation = useAuthNavigation();
+  const tabs = useNavigation<BottomTabNavigationProp<ArtisanTabParamList>>();
   const artisanProfile = useAppSelector(selectArtisanProfile);
-  // The last checklist item unlocks once the artisan receives a real request.
-  const hasJobRequest = NEW_JOB_REQUESTS.length > 0;
+  const jobs = useAppSelector(selectArtisanJobs);
+  const pendingJobs = useMemo(
+    () => jobs.filter(job => job.status === 'pending'),
+    [jobs],
+  );
+  const upcomingCount = useMemo(
+    () =>
+      jobs.filter(
+        job => job.status === 'accepted' || job.status === 'ongoing',
+      ).length,
+    [jobs],
+  );
+  const completedCount = useMemo(
+    () => jobs.filter(job => job.status === 'completed').length,
+    [jobs],
+  );
+  const rating = (artisanProfile?.rating ?? 0).toFixed(1);
+  const reviewCount = artisanProfile?.reviewsCount ?? 0;
+  // Receiving a request is tracked on the checklist, but it does not keep the
+  // profile-setup header on screen once services, photos, and pricing are set.
   const profileTasks = useMemo(
-    () => buildArtisanProfileTasks(artisanProfile, hasJobRequest),
-    [artisanProfile, hasJobRequest],
+    () => buildArtisanProfileTasks(artisanProfile, pendingJobs.length > 0),
+    [artisanProfile, pendingJobs.length],
   );
   const profileComplete = isProfileSetupComplete(profileTasks);
   const completionPercent = getProfileCompletionPercent(profileTasks);
-  const onViewRequest = (_request: JobRequest) => {};
+  const openJob = (job: ArtisanJob) =>
+    navigation.navigate('ArtisanJobDetail', { jobId: job.id });
   const onViewUpcoming = (_request: UpcomingRequest) => {};
 
   return (
@@ -225,13 +249,13 @@ function ApprovedDashboard({
               Icon={BriefcaseIcon}
               label="Pending Requests"
               sublabel="Awaiting response"
-              value={`${ARTISAN_STATS.pendingRequests}`}
+              value={`${pendingJobs.length}`}
             />
             <ArtisanStatCard
               Icon={<StarIcon2 size={20} />}
               label="Upcoming Jobs"
               sublabel="Scheduled jobs"
-              value={`${ARTISAN_STATS.upcomingJobs}`}
+              value={`${upcomingCount}`}
             />
           </View>
         )}
@@ -240,27 +264,31 @@ function ApprovedDashboard({
             Icon={BriefcaseIcon}
             label="Jobs Completed"
             sublabel="Finished jobs"
-            value={`${ARTISAN_STATS.jobsCompleted}`}
+            value={`${completedCount}`}
           />
           <ArtisanStatCard
             Icon={<StarIcon2 size={20} />}
             label="Current Rating"
-            sublabel={`${ARTISAN_STATS.reviews} Reviews`}
-            value={ARTISAN_STATS.rating}
+            sublabel={`${reviewCount} ${reviewCount === 1 ? 'Review' : 'Reviews'}`}
+            value={rating}
           />
         </View>
       </View>
 
       <View style={styles.section}>
-        {NEW_JOB_REQUESTS.length > 0 ? (
+        {pendingJobs.length > 0 ? (
           <>
-            <SectionHeader actionLabel="See all" title="New job request" />
+            <SectionHeader
+              actionLabel="See all"
+              onAction={() => tabs.navigate('jobs')}
+              title="New job request"
+            />
             <View style={styles.list}>
-              {NEW_JOB_REQUESTS.map(request => (
-                <JobRequestCard
-                  key={request.id}
-                  onViewDetails={onViewRequest}
-                  request={request}
+              {pendingJobs.map(job => (
+                <ArtisanJobCard
+                  key={job.id}
+                  job={job}
+                  onViewDetails={openJob}
                 />
               ))}
             </View>

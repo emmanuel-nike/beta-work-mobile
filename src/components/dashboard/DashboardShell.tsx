@@ -331,14 +331,21 @@ export function SearchBar({
 type SectionHeaderProps = Readonly<{
   title: string;
   actionLabel?: string;
+  onAction?: () => void;
 }>;
 
-export function SectionHeader({ title, actionLabel }: SectionHeaderProps) {
+export function SectionHeader({ title, actionLabel, onAction }: SectionHeaderProps) {
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {actionLabel ? (
-        <Text style={styles.sectionAction}>{actionLabel}</Text>
+        <Pressable
+          accessibilityRole="button"
+          disabled={!onAction}
+          onPress={onAction}
+        >
+          <Text style={styles.sectionAction}>{actionLabel}</Text>
+        </Pressable>
       ) : null}
     </View>
   );
