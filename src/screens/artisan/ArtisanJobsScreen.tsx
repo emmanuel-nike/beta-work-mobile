@@ -1,9 +1,10 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -41,11 +42,20 @@ export function ArtisanJobsScreen() {
   const loadStatus = useAppSelector(selectArtisanJobsStatus);
   const loadError = useAppSelector(selectArtisanJobsError);
   const [filter, setFilter] = useState<JobFilter>('all');
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (isVerified) {
       dispatch(loadMyJobs());
     }
+  }, [dispatch, isVerified]);
+
+  const onRefresh = useCallback(() => {
+    if (!isVerified) {
+      return;
+    }
+    setRefreshing(true);
+    dispatch(loadMyJobs()).finally(() => setRefreshing(false));
   }, [dispatch, isVerified]);
 
   const jobs = useMemo(
@@ -96,9 +106,31 @@ export function ArtisanJobsScreen() {
             <ActivityIndicator color={dashboardColors.tabBar} />
           </View>
         ) : !hasAnyJobs ? (
-          <AllEmptyState message={loadStatus === 'failed' ? loadError : null} />
+          <ScrollView
+            contentContainerStyle={styles.refreshScroll}
+            refreshControl={
+              <JobsRefreshControl
+                onRefresh={onRefresh}
+                refreshing={refreshing}
+              />
+            }
+          >
+            <AllEmptyState
+              message={loadStatus === 'failed' ? loadError : null}
+            />
+          </ScrollView>
         ) : jobs.length === 0 ? (
-          <CategoryEmptyState filter={filter} />
+          <ScrollView
+            contentContainerStyle={styles.refreshScroll}
+            refreshControl={
+              <JobsRefreshControl
+                onRefresh={onRefresh}
+                refreshing={refreshing}
+              />
+            }
+          >
+            <CategoryEmptyState filter={filter} />
+          </ScrollView>
         ) : (
           <FlatList
             contentContainerStyle={[
@@ -107,6 +139,12 @@ export function ArtisanJobsScreen() {
             ]}
             data={jobs}
             keyExtractor={item => item.id}
+            refreshControl={
+              <JobsRefreshControl
+                onRefresh={onRefresh}
+                refreshing={refreshing}
+              />
+            }
             renderItem={({ item }) => (
               <ArtisanJobCard job={item} onViewDetails={openJob} />
             )}
@@ -115,6 +153,20 @@ export function ArtisanJobsScreen() {
         )}
       </View>
     </View>
+  );
+}
+
+function JobsRefreshControl({
+  refreshing,
+  onRefresh,
+}: Readonly<{ refreshing: boolean; onRefresh: () => void }>) {
+  return (
+    <RefreshControl
+      colors={[dashboardColors.tabBar]}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+      tintColor={dashboardColors.tabBar}
+    />
   );
 }
 
@@ -197,6 +249,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
+  },
+  refreshScroll: {
+    flexGrow: 1,
   },
   allEmpty: {
     marginTop: 45,

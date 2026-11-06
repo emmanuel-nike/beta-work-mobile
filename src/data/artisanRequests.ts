@@ -37,25 +37,9 @@ export type ArtisanReview = Readonly<{
   avatar: ImageSourcePropType;
 }>;
 
-export type ArtisanStats = Readonly<{
-  pendingRequests: number;
-  upcomingJobs: number;
-  jobsCompleted: number;
-  rating: string;
-  reviews: number;
-}>;
-
 const CLIENT_A = require('../../assets/images/dashboard/image0_1174_145674.png');
 const CLIENT_B = require('../../assets/images/dashboard/image1_1174_145674.png');
 const CLIENT_C = require('../../assets/images/dashboard/image1_676_87466.png');
-
-export const ARTISAN_STATS: ArtisanStats = {
-  pendingRequests: 4,
-  upcomingJobs: 8,
-  jobsCompleted: 14,
-  rating: '4.9',
-  reviews: 14,
-};
 
 export const NEW_JOB_REQUESTS: readonly JobRequest[] = [];
 
@@ -119,6 +103,56 @@ export const ARTISAN_PROFILE_TASKS: readonly ArtisanProfileTask[] = [
   },
 ];
 
+/** Checklist rows that make up profile setup. A job request is separate. */
+const PROFILE_SETUP_TASK_IDS = [
+  'add-services',
+  'upload-portfolio',
+  'set-pricing',
+] as const;
+
+function hasServicesOffered(profile: ArtisanProfileData | null): boolean {
+  if (!profile) {
+    return false;
+  }
+  if (profile.trade.trim().length > 0) {
+    return true;
+  }
+  if ((profile.additionalServices?.length ?? 0) > 0) {
+    return true;
+  }
+  return (profile.servicePricing ?? []).some(row => row.service.trim().length > 0);
+}
+
+function hasPricingAndDuration(profile: ArtisanProfileData | null): boolean {
+  if (!profile) {
+    return false;
+  }
+  const hasPricing = (profile.servicePricing ?? []).some(
+    row =>
+      row.service.trim().length > 0 &&
+      row.minPrice != null &&
+      row.maxPrice != null,
+  );
+  const hasDuration =
+    profile.minimumLeadTimeHours != null ||
+    hasWorkingSchedule(profile.weeklySchedule);
+  return hasPricing && hasDuration;
+}
+
+function hasWorkingSchedule(
+  schedule: ArtisanProfileData['weeklySchedule'],
+): boolean {
+  if (!schedule) {
+    return false;
+  }
+  return Object.values(schedule).some(
+    day =>
+      Boolean(day?.enabled) &&
+      day.start.trim().length > 0 &&
+      day.end.trim().length > 0,
+  );
+}
+
 /**
  * Build the profile-setup checklist from the artisan's saved portfolio plus
  * whether they have received a job request yet. Each task is marked complete
@@ -128,22 +162,21 @@ export function buildArtisanProfileTasks(
   profile: ArtisanProfileData | null,
   hasJobRequest: boolean,
 ): ArtisanProfileTask[] {
-  const hasServices =
-    Boolean(profile?.bio) || (profile?.additionalServices?.length ?? 0) > 0;
-  const hasPortfolioImages = (profile?.portfolioImages?.length ?? 0) > 0;
-  const hasPricing = (profile?.servicePricing?.length ?? 0) > 0;
-
   return [
-    { id: 'add-services', label: 'Add services you offer', completed: hasServices },
+    {
+      id: 'add-services',
+      label: 'Add services you offer',
+      completed: hasServicesOffered(profile),
+    },
     {
       id: 'upload-portfolio',
       label: 'Upload pictures of past work',
-      completed: hasPortfolioImages,
+      completed: (profile?.portfolioImages?.length ?? 0) > 0,
     },
     {
       id: 'set-pricing',
       label: 'Set pricing and job duration',
-      completed: hasPricing,
+      completed: hasPricingAndDuration(profile),
     },
     {
       id: 'receive-requests',
@@ -166,5 +199,8 @@ export function getProfileCompletionPercent(
 export function isProfileSetupComplete(
   tasks: readonly ArtisanProfileTask[],
 ): boolean {
-  return tasks.length > 0 && tasks.every(task => task.completed);
+  const setupTasks = tasks.filter(task =>
+    PROFILE_SETUP_TASK_IDS.some(id => id === task.id),
+  );
+  return setupTasks.length > 0 && setupTasks.every(task => task.completed);
 }

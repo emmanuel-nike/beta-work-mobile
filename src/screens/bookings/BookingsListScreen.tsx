@@ -88,6 +88,7 @@ export function BookingsListScreen() {
         </View>
       ) : bookings.length === 0 ? (
         <EmptyState
+          bookingStatus={activeFilter}
           onFindArtisans={() =>
             authNavigation.navigate('AllArtisans', {
               title: 'Top artisans near you',
@@ -114,14 +115,20 @@ export function BookingsListScreen() {
 
 function EmptyState({
   onFindArtisans,
-}: Readonly<{ onFindArtisans: () => void }>) {
+  bookingStatus,
+}: Readonly<{ onFindArtisans: () => void; bookingStatus?: string }>) {
   return (
     <View style={styles.empty}>
       <BookingsEmptyArtwork height={260} width={260} />
-      <Text style={styles.emptyTitle}>No bookings yet</Text>
+      {bookingStatus && bookingStatus !== 'all' ? (
+        <Text style={styles.emptyTitle}>No {bookingStatus} bookings yet</Text>
+      ) : (
+        <Text style={styles.emptyTitle}>No bookings yet</Text>
+      )}
       <Text style={styles.emptyBody}>
-        You currently have no active service requests. Find a verified
-        professional near you!
+        {bookingStatus && bookingStatus !== 'all'
+          ? `You currently have no ${bookingStatus} bookings. Find a verified professional near you!`
+          : `You currently have no bookings. Find a verified professional near you!`}
       </Text>
       <BookingButton
         compact
@@ -201,5 +208,6 @@ const styles = StyleSheet.create({
   emptyButton: {
     marginTop: 24,
     width: 240,
+    marginHorizontal: 'auto',
   },
 });

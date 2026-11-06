@@ -78,7 +78,9 @@ export function StatusTimeline({ steps }: StatusTimelineProps) {
                 >
                   {step.label}
                 </Text>
-                <Text style={styles.date}>{timestamp(step)}</Text>
+                <Text style={styles.date}>
+                  {step.state !== 'inactive' ? timestamp(step) : '—'}
+                </Text>
               </View>
               {step.detail ? (
                 <Text style={styles.time}>{step.detail}</Text>

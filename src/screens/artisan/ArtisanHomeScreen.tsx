@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { loadMyJobs } from '../../store/slices/artisanJobsSlice';
 import {
   loadArtisanProfile,
   refreshArtisanStatus,
@@ -23,6 +24,12 @@ export function ArtisanHomeScreen() {
       dispatch(loadArtisanProfile());
     }
   }, [dispatch, token]);
+
+  useEffect(() => {
+    if (token && isVerified) {
+      dispatch(loadMyJobs());
+    }
+  }, [dispatch, token, isVerified]);
 
   return <ArtisanDashboardScreen isVerified={isVerified} />;
 }

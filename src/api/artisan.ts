@@ -30,6 +30,8 @@ export type ArtisanProfileData = Readonly<{
   minimumLeadTimeHours: number | null;
   weeklySchedule: WeeklySchedule | null;
   verificationStatus: string;
+  rating: number;
+  reviewsCount: number;
 }>;
 
 export type ArtisanProfileResponse = Readonly<{
