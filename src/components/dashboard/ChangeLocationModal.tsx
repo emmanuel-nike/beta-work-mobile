@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -11,20 +11,17 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { RECENT_ADDRESSES, type SavedAddress } from '../../data/locations';
+import { saveAddress } from '../../api/addresses';
+import type { AddressSelection } from '../../data/locations';
+import { useRecentAddresses } from '../../hooks/useRecentAddresses';
 import {
   autocompleteAddress,
+  captureCurrentLocation,
   newSessionToken,
   resolvePlace,
   type AddressPrediction,
 } from '../../services/geocoding';
-import {
-  CloseIcon,
-  CurrentLocationIcon,
-  EditIcon,
-  MapPinIcon,
-  SearchIcon,
-} from '../icons';
+import { CloseIcon, CurrentLocationIcon, MapPinIcon, SearchIcon } from '../icons';
 
 const SURFACE = '#F7F1E6';
 const FIELD = '#F5EDE2';
@@ -35,39 +32,30 @@ const ADDRESS = '#1B1105';
 const SUBDUED = '#736051';
 const ACCENT = '#0F6743';
 
-/** A chosen location; coordinates are present when resolved via geocoding. */
-export type DashboardLocationSelection = Readonly<{
-  label: string;
-  latitude: number | null;
-  longitude: number | null;
-}>;
-
 type ChangeLocationModalProps = Readonly<{
   visible: boolean;
   onClose: () => void;
-  onSelect: (location: DashboardLocationSelection) => void;
-  onUseCurrentLocation?: () => void;
-  onEditAddress?: (address: SavedAddress) => void;
+  onSelect: (location: AddressSelection) => void;
 }>;
 
 export function ChangeLocationModal({
   visible,
   onClose,
   onSelect,
-  onUseCurrentLocation,
-  onEditAddress,
 }: ChangeLocationModalProps) {
   const insets = useSafeAreaInsets();
+  const recent = useRecentAddresses(visible);
   const [query, setQuery] = useState('');
   const [predictions, setPredictions] = useState<AddressPrediction[]>([]);
   const [isSearching, setSearching] = useState(false);
-  const [isResolving, setResolving] = useState(false);
+  const [isBusy, setBusy] = useState(false);
   const sessionToken = useRef(newSessionToken());
 
   useEffect(() => {
     if (visible) {
       setQuery('');
       setPredictions([]);
+      setBusy(false);
       sessionToken.current = newSessionToken();
     }
   }, [visible]);
@@ -104,37 +92,38 @@ export function ChangeLocationModal({
     };
   }, [query, visible]);
 
+  // Persist the selection (best-effort) and hand it to the parent.
+  const commit = (selection: AddressSelection) => {
+    saveAddress(selection).catch(() => {});
+    onSelect(selection);
+  };
+
   const selectPrediction = async (prediction: AddressPrediction) => {
-    if (isResolving) {
+    if (isBusy) {
       return;
     }
-    setResolving(true);
+    setBusy(true);
     try {
       const place = await resolvePlace(prediction.placeId, sessionToken.current);
-      onSelect({
-        label: place.address || prediction.description,
-        latitude: place.latitude,
-        longitude: place.longitude,
-      });
+      commit(place);
     } catch {
-      onSelect({ label: prediction.description, latitude: null, longitude: null });
+      setBusy(false);
     } finally {
-      setResolving(false);
       sessionToken.current = newSessionToken();
     }
   };
 
-  const savedMatches = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (needle.length === 0) {
-      return RECENT_ADDRESSES;
+  const useCurrentLocation = async () => {
+    if (isBusy) {
+      return;
     }
-    return RECENT_ADDRESSES.filter(
-      item =>
-        item.address.toLowerCase().includes(needle) ||
-        item.area.toLowerCase().includes(needle),
-    );
-  }, [query]);
+    setBusy(true);
+    try {
+      commit(await captureCurrentLocation());
+    } catch {
+      setBusy(false);
+    }
+  };
 
   const showPredictions = query.trim().length >= 3;
 
@@ -170,24 +159,23 @@ export function ChangeLocationModal({
             style={styles.searchInput}
             value={query}
           />
-          {isSearching || isResolving ? (
-            <ActivityIndicator color={SUBDUED} size="small" />
-          ) : null}
+          {isSearching ? <ActivityIndicator color={SUBDUED} size="small" /> : null}
         </View>
 
         <Pressable
           accessibilityRole="button"
-          onPress={onUseCurrentLocation}
+          disabled={isBusy}
+          onPress={useCurrentLocation}
           style={({ pressed }) => [styles.currentRow, pressed && styles.pressed]}
         >
-          <CurrentLocationIcon />
+          {isBusy ? <ActivityIndicator color={ACCENT} size="small" /> : <CurrentLocationIcon />}
           <Text style={styles.currentLabel}>Use your current location</Text>
         </Pressable>
 
         <View style={styles.divider} />
 
         <Text style={styles.sectionTitle}>
-          {showPredictions ? 'Search results' : 'Recent addresses'}
+          {showPredictions ? 'Address suggestions' : 'Recent addresses'}
         </Text>
 
         <ScrollView
@@ -202,10 +190,7 @@ export function ChangeLocationModal({
                   accessibilityRole="button"
                   key={prediction.placeId}
                   onPress={() => selectPrediction(prediction)}
-                  style={({ pressed }) => [
-                    styles.addressRow,
-                    pressed && styles.pressed,
-                  ]}
+                  style={({ pressed }) => [styles.addressRow, pressed && styles.pressed]}
                 >
                   <View style={styles.pin}>
                     <MapPinIcon />
@@ -214,47 +199,29 @@ export function ChangeLocationModal({
                 </Pressable>
               ))}
               {!isSearching && predictions.length === 0 ? (
-                <Text style={styles.noResults}>
-                  No addresses match “{query.trim()}”.
-                </Text>
+                <Text style={styles.noResults}>No addresses match “{query.trim()}”.</Text>
               ) : null}
             </>
+          ) : recent.length === 0 ? (
+            <Text style={styles.noResults}>No recent addresses yet.</Text>
           ) : (
-            savedMatches.map(address => (
-              <View key={address.id} style={styles.addressRow}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() =>
-                    onSelect({
-                      label: address.label,
-                      latitude: null,
-                      longitude: null,
-                    })
-                  }
-                  style={({ pressed }) => [
-                    styles.addressMain,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <View style={styles.pin}>
-                    <MapPinIcon />
-                  </View>
-                  <View style={styles.addressCopy}>
-                    <Text style={styles.addressText}>{address.address}</Text>
-                    <Text style={styles.areaText}>{address.area}</Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  accessibilityLabel={`Edit ${address.area}`}
-                  accessibilityRole="button"
-                  hitSlop={10}
-                  onPress={() => onEditAddress?.(address)}
-                  style={({ pressed }) => pressed && styles.pressed}
-                >
-                  <EditIcon />
-                </Pressable>
-              </View>
+            recent.map(address => (
+              <Pressable
+                accessibilityRole="button"
+                key={address.id}
+                onPress={() => commit(address)}
+                style={({ pressed }) => [styles.addressRow, pressed && styles.pressed]}
+              >
+                <View style={styles.pin}>
+                  <MapPinIcon />
+                </View>
+                <View style={styles.addressCopy}>
+                  <Text style={styles.addressText}>{address.line1 || address.address}</Text>
+                  <Text style={styles.areaText}>
+                    {[address.city, address.state].filter(Boolean).join(', ')}
+                  </Text>
+                </View>
+              </Pressable>
             ))
           )}
         </ScrollView>
@@ -338,12 +305,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     paddingVertical: 14,
-  },
-  addressMain: {
-    alignItems: 'flex-start',
-    flex: 1,
-    flexDirection: 'row',
-    gap: 10,
   },
   pin: {
     paddingTop: 1,

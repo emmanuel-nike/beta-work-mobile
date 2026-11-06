@@ -11,13 +11,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CloseIcon, CurrentLocationIcon, MapPinIcon, SearchIcon } from '../icons';
+import { saveAddress } from '../../api/addresses';
+import { useRecentAddresses } from '../../hooks/useRecentAddresses';
 import {
   autocompleteAddress,
+  captureCurrentLocation,
   newSessionToken,
   resolvePlace,
   type AddressPrediction,
 } from '../../services/geocoding';
+import { CloseIcon, CurrentLocationIcon, MapPinIcon, SearchIcon } from '../icons';
 
 const SURFACE = '#FBF6EC';
 const FIELD_BORDER = '#A99F8E';
@@ -27,15 +30,16 @@ const ADDRESS = '#1B1105';
 const MUTED = '#736051';
 const ACCENT = '#0F6743';
 
-const RECENT_LOCATIONS = [
-  '145 Adetokunbo Ademola Crescent, Wuse 2',
-  'Jabi Lake Mall, Jabi, Abuja',
-  'Wuse Market, Wuse 2, Abuja',
-];
-
-/** A chosen service location; coordinates are present when geocoded. */
+/**
+ * A chosen service location. Coordinates/components are present when the
+ * address was geocoded; a free-typed address carries just the text.
+ */
 export type SelectedLocation = Readonly<{
   address: string;
+  line1: string;
+  city: string;
+  state: string;
+  postalCode: string | null;
   latitude: number | null;
   longitude: number | null;
 }>;
@@ -45,8 +49,6 @@ type ServiceLocationModalProps = Readonly<{
   initialValue?: string;
   onClose: () => void;
   onSelect: (location: SelectedLocation) => void;
-  /** Capture the device's GPS position as the service location. */
-  onUseCurrentLocation: () => void;
 }>;
 
 export function ServiceLocationModal({
@@ -54,19 +56,20 @@ export function ServiceLocationModal({
   initialValue,
   onClose,
   onSelect,
-  onUseCurrentLocation,
 }: ServiceLocationModalProps) {
   const insets = useSafeAreaInsets();
+  const recent = useRecentAddresses(visible);
   const [query, setQuery] = useState(initialValue ?? '');
   const [predictions, setPredictions] = useState<AddressPrediction[]>([]);
   const [isSearching, setSearching] = useState(false);
-  const [isResolving, setResolving] = useState(false);
+  const [isBusy, setBusy] = useState(false);
   const sessionToken = useRef(newSessionToken());
 
   useEffect(() => {
     if (visible) {
       setQuery(initialValue ?? '');
       setPredictions([]);
+      setBusy(false);
       sessionToken.current = newSessionToken();
     }
   }, [initialValue, visible]);
@@ -103,29 +106,55 @@ export function ServiceLocationModal({
     };
   }, [query, visible]);
 
+  // Persist geocoded selections (best-effort) and hand the choice to the parent.
+  const commit = (selection: SelectedLocation) => {
+    if (selection.latitude !== null && selection.longitude !== null) {
+      saveAddress({
+        address: selection.address,
+        line1: selection.line1,
+        city: selection.city,
+        state: selection.state,
+        postalCode: selection.postalCode,
+        latitude: selection.latitude,
+        longitude: selection.longitude,
+      }).catch(() => {});
+    }
+    onSelect(selection);
+  };
+
   const selectPrediction = async (prediction: AddressPrediction) => {
-    if (isResolving) {
+    if (isBusy) {
       return;
     }
-    setResolving(true);
+    setBusy(true);
     try {
       const place = await resolvePlace(prediction.placeId, sessionToken.current);
-      onSelect({
-        address: place.address || prediction.description,
-        latitude: place.latitude,
-        longitude: place.longitude,
-      });
+      commit(place);
     } catch {
-      // Keep the chosen text even if coordinates couldn't be resolved.
-      onSelect({
+      commit({
         address: prediction.description,
+        line1: prediction.description,
+        city: '',
+        state: '',
+        postalCode: null,
         latitude: null,
         longitude: null,
       });
     } finally {
-      setResolving(false);
-      // A session ends once details are fetched; start a fresh one.
+      setBusy(false);
       sessionToken.current = newSessionToken();
+    }
+  };
+
+  const useCurrentLocation = async () => {
+    if (isBusy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      commit(await captureCurrentLocation());
+    } catch {
+      setBusy(false);
     }
   };
 
@@ -133,14 +162,22 @@ export function ServiceLocationModal({
   // the typed text without coordinates.
   const confirm = async () => {
     const trimmed = query.trim();
-    if (trimmed.length === 0 || isResolving) {
+    if (trimmed.length === 0 || isBusy) {
       return;
     }
     if (predictions.length > 0) {
       await selectPrediction(predictions[0]);
       return;
     }
-    onSelect({ address: trimmed, latitude: null, longitude: null });
+    commit({
+      address: trimmed,
+      line1: trimmed,
+      city: '',
+      state: '',
+      postalCode: null,
+      latitude: null,
+      longitude: null,
+    });
   };
 
   const showPredictions = query.trim().length >= 3;
@@ -191,12 +228,17 @@ export function ServiceLocationModal({
 
           <Pressable
             accessibilityRole="button"
-            onPress={onUseCurrentLocation}
+            disabled={isBusy}
+            onPress={useCurrentLocation}
             style={({ pressed }) => [
               styles.currentLocation,
               pressed && styles.pressed,
             ]}>
-            <CurrentLocationIcon color={ACCENT} size={18} />
+            {isBusy ? (
+              <ActivityIndicator color={ACCENT} size="small" />
+            ) : (
+              <CurrentLocationIcon color={ACCENT} size={18} />
+            )}
             <Text style={styles.currentLocationLabel}>
               Use your current location
             </Text>
@@ -204,15 +246,13 @@ export function ServiceLocationModal({
 
           <View style={styles.divider} />
 
-          {showPredictions ? (
-            <>
-              <Text style={styles.sectionLabel}>Suggestions</Text>
-              {!isSearching && predictions.length === 0 ? (
-                <Text style={styles.empty}>No matching addresses.</Text>
-              ) : null}
-              <ScrollView
-                keyboardShouldPersistTaps="handled"
-                style={styles.results}>
+          <Text style={styles.sectionLabel}>
+            {showPredictions ? 'Address suggestions' : 'Recent addresses'}
+          </Text>
+
+          <ScrollView keyboardShouldPersistTaps="handled" style={styles.results}>
+            {showPredictions ? (
+              <>
                 {predictions.map(prediction => (
                   <Pressable
                     accessibilityRole="button"
@@ -228,41 +268,45 @@ export function ServiceLocationModal({
                     </Text>
                   </Pressable>
                 ))}
-              </ScrollView>
-            </>
-          ) : (
-            <>
-              <Text style={styles.sectionLabel}>Recent locations</Text>
-              {RECENT_LOCATIONS.map(location => (
+                {!isSearching && predictions.length === 0 ? (
+                  <Text style={styles.empty}>No matching addresses.</Text>
+                ) : null}
+              </>
+            ) : recent.length === 0 ? (
+              <Text style={styles.empty}>No recent addresses yet.</Text>
+            ) : (
+              recent.map(address => (
                 <Pressable
                   accessibilityRole="button"
-                  key={location}
-                  onPress={() => setQuery(location)}
+                  key={address.id}
+                  onPress={() => commit(address)}
                   style={({ pressed }) => [
                     styles.recentRow,
                     pressed && styles.pressed,
                   ]}>
                   <MapPinIcon color={MUTED} size={16} />
-                  <Text numberOfLines={1} style={styles.recentLabel}>
-                    {location}
+                  <Text numberOfLines={2} style={styles.recentLabel}>
+                    {address.line1 || address.address}
+                    {address.city ? `, ${address.city}` : ''}
+                    {address.state ? `, ${address.state}` : ''}
                   </Text>
                 </Pressable>
-              ))}
-            </>
-          )}
+              ))
+            )}
+          </ScrollView>
 
           <View style={styles.divider} />
 
           <Pressable
             accessibilityRole="button"
-            disabled={query.trim().length === 0 || isResolving}
+            disabled={query.trim().length === 0 || isBusy}
             onPress={confirm}
             style={({ pressed }) => [
               styles.confirm,
-              (query.trim().length === 0 || isResolving) && styles.confirmDisabled,
+              (query.trim().length === 0 || isBusy) && styles.confirmDisabled,
               pressed && styles.pressed,
             ]}>
-            {isResolving ? (
+            {isBusy ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text style={styles.confirmLabel}>Use this address</Text>

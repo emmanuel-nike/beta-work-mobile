@@ -1,32 +1,25 @@
 export type SavedAddress = Readonly<{
   id: string;
-  /** The address line shown in full. */
+  /** Full formatted address, e.g. "12 Allen Ave, Ikeja, Lagos, Nigeria". */
   address: string;
-  /** Area or landmark shown underneath. */
-  area: string;
-  /** Compact form used in the dashboard header. */
-  label: string;
+  /** Street-level line, e.g. "12 Allen Avenue". */
+  line1: string;
+  city: string;
+  state: string;
+  postalCode: string | null;
+  latitude: number;
+  longitude: number;
 }>;
 
-export const RECENT_ADDRESSES: readonly SavedAddress[] = [
-  {
-    id: 'addr-1',
-    address: '123 Maple Street, near the Abuja National Mosque,',
-    area: 'National Mosque Federal Capital',
-    label: 'Maple Street, Abuja',
-  },
-  {
-    id: 'addr-2',
-    address: '456 Elm Avenue, opposite the Unity Fountain,',
-    area: 'Unity Fountain District, Abuja',
-    label: 'Unity Fountain, Abuja',
-  },
-  {
-    id: 'addr-3',
-    address: '789 Pine Road, adjacent to Jabi Lake Mall,',
-    area: 'Jabi Lake Area, Abuja',
-    label: 'Jabi Lake, Abuja',
-  },
-];
+/** A chosen address before it is persisted (no id yet). */
+export type AddressSelection = Omit<SavedAddress, 'id'>;
 
-export const DEFAULT_LOCATION_LABEL = 'Maitaima, Abuja';
+/** Header prompt shown before the user has picked a location. */
+export const DEFAULT_LOCATION_LABEL = 'Set your location';
+
+/** Compact "City, State" form used in the dashboard header. */
+export function formatArea(
+  address: Pick<SavedAddress, 'city' | 'state'>,
+): string {
+  return [address.city, address.state].filter(Boolean).join(', ');
+}

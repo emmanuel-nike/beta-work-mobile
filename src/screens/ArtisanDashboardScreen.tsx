@@ -1,15 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ArtisanStatCard } from '../components/artisan/ArtisanStatCard';
 import { JobRequestCard } from '../components/artisan/JobRequestCard';
 import { ProfileReviewCard } from '../components/artisan/ProfileReviewCard';
 import { UpcomingRequestCard } from '../components/artisan/UpcomingRequestCard';
-import {
-  ChangeLocationModal,
-  type DashboardLocationSelection,
-} from '../components/dashboard/ChangeLocationModal';
-import { captureCurrentLocation } from '../services/geocoding';
+import { ChangeLocationModal } from '../components/dashboard/ChangeLocationModal';
 import {
   DashboardCard,
   DashboardHeader,
@@ -42,7 +38,11 @@ import {
   type JobRequest,
   type UpcomingRequest,
 } from '../data/artisanRequests';
-import { DEFAULT_LOCATION_LABEL } from '../data/locations';
+import {
+  DEFAULT_LOCATION_LABEL,
+  formatArea,
+  type AddressSelection,
+} from '../data/locations';
 import { useAuthNavigation } from '../navigation/types';
 import { useAppSelector } from '../store/hooks';
 import {
@@ -66,25 +66,11 @@ export function ArtisanDashboardScreen({
   const [isLocationPickerOpen, setLocationPickerOpen] = useState(false);
   const [location, setLocation] = useState(DEFAULT_LOCATION_LABEL);
 
-  const handleSelectLocation = (selection: DashboardLocationSelection) => {
-    setLocation(selection.label);
+  const handleSelectLocation = (selection: AddressSelection) => {
+    setLocation(
+      formatArea(selection) || selection.address || DEFAULT_LOCATION_LABEL,
+    );
     setLocationPickerOpen(false);
-  };
-
-  const handleUseCurrentLocation = async () => {
-    try {
-      const place = await captureCurrentLocation();
-      setLocation(place.address || 'Current location');
-    } catch (error) {
-      Alert.alert(
-        'Location unavailable',
-        error instanceof Error
-          ? error.message
-          : 'Could not get your current location.',
-      );
-    } finally {
-      setLocationPickerOpen(false);
-    }
   };
 
   const locationProps = {
@@ -106,7 +92,6 @@ export function ArtisanDashboardScreen({
       <ChangeLocationModal
         onClose={() => setLocationPickerOpen(false)}
         onSelect={handleSelectLocation}
-        onUseCurrentLocation={handleUseCurrentLocation}
         visible={isLocationPickerOpen}
       />
     </>

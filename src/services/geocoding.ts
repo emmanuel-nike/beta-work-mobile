@@ -7,7 +7,13 @@ export type AddressPrediction = Readonly<{
 }>;
 
 export type ResolvedPlace = Readonly<{
+  /** Full formatted address. */
   address: string;
+  /** Street-level line. */
+  line1: string;
+  city: string;
+  state: string;
+  postalCode: string | null;
   latitude: number;
   longitude: number;
 }>;
@@ -70,7 +76,15 @@ export async function captureCurrentLocation(): Promise<ResolvedPlace> {
     const place = await reverseGeocode(coords.latitude, coords.longitude);
     return { ...place, latitude: coords.latitude, longitude: coords.longitude };
   } catch {
-    return { address: '', latitude: coords.latitude, longitude: coords.longitude };
+    return {
+      address: '',
+      line1: '',
+      city: '',
+      state: '',
+      postalCode: null,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+    };
   }
 }
 

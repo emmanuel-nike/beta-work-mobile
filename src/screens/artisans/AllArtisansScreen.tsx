@@ -38,7 +38,7 @@ import {
   type Artisan,
   type ArtisanCategory,
 } from '../../data/artisans';
-import { DEFAULT_LOCATION_LABEL } from '../../data/locations';
+import { DEFAULT_LOCATION_LABEL, formatArea } from '../../data/locations';
 import type { AuthStackScreenProps } from '../../navigation/types';
 import { useAppDispatch } from '../../store/hooks';
 import { cacheArtisans } from '../../store/slices/artisansSlice';
@@ -257,8 +257,10 @@ export function AllArtisansScreen({
 
       <ChangeLocationModal
         onClose={() => setLocationOpen(false)}
-        onSelect={address => {
-          setLocation(address.label);
+        onSelect={selection => {
+          setLocation(
+            formatArea(selection) || selection.address || DEFAULT_LOCATION_LABEL,
+          );
           setLocationOpen(false);
         }}
         visible={isLocationOpen}
