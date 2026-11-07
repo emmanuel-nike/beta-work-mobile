@@ -22,6 +22,7 @@ import { WhyBetaWorkSection } from '../components/dashboard/WhyBetaWorkSection';
 import { RECENTLY_VIEWED_ARTISANS, type Artisan } from '../data/artisans';
 import { ARTISAN_SERVICES } from '../data/artisanServices';
 import { type Booking } from '../data/bookings';
+import { fetchRecentAddresses } from '../api/addresses';
 import {
   DEFAULT_LOCATION_LABEL,
   formatArea,
@@ -65,6 +66,30 @@ export function UserDashboardScreen() {
   const dashboardBookings = bookings.slice(0, DASHBOARD_BOOKING_LIMIT);
   const [isLocationPickerOpen, setLocationPickerOpen] = useState(false);
   const [location, setLocation] = useState(DEFAULT_LOCATION_LABEL);
+
+  // On load, seed the header with the user's most recent saved address. Only
+  // while the location is still unset, so it never overrides a session choice,
+  // and left as-is when the user has never saved a location.
+  useEffect(() => {
+    let cancelled = false;
+    fetchRecentAddresses()
+      .then(list => {
+        const latest = list[0];
+        if (cancelled || !latest) {
+          return;
+        }
+        const label = formatArea(latest) || latest.address;
+        if (label) {
+          setLocation(prev =>
+            prev === DEFAULT_LOCATION_LABEL ? label : prev,
+          );
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSelectArtisan = (artisan: Artisan) =>
     authNavigation.navigate('ArtisanProfile', { artisanId: artisan.id });
