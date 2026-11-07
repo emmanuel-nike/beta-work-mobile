@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { saveAddress } from '../../api/addresses';
-import type { AddressSelection } from '../../data/locations';
+import type { AddressScope, AddressSelection } from '../../data/locations';
 import { useRecentAddresses } from '../../hooks/useRecentAddresses';
 import {
   autocompleteAddress,
@@ -34,17 +34,20 @@ const ACCENT = '#0F6743';
 
 type ChangeLocationModalProps = Readonly<{
   visible: boolean;
+  /** App mode the chosen address belongs to. */
+  scope: AddressScope;
   onClose: () => void;
   onSelect: (location: AddressSelection) => void;
 }>;
 
 export function ChangeLocationModal({
   visible,
+  scope,
   onClose,
   onSelect,
 }: ChangeLocationModalProps) {
   const insets = useSafeAreaInsets();
-  const recent = useRecentAddresses(visible);
+  const recent = useRecentAddresses(visible, scope);
   const [query, setQuery] = useState('');
   const [predictions, setPredictions] = useState<AddressPrediction[]>([]);
   const [isSearching, setSearching] = useState(false);
@@ -94,7 +97,7 @@ export function ChangeLocationModal({
 
   // Persist the selection (best-effort) and hand it to the parent.
   const commit = (selection: AddressSelection) => {
-    saveAddress(selection).catch(() => {});
+    saveAddress(selection, scope).catch(() => {});
     onSelect(selection);
   };
 

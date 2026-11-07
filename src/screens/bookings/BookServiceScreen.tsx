@@ -87,7 +87,7 @@ export function BookServiceScreen({
         location: place.address || 'Current location',
       });
       if (place.address) {
-        saveAddress(place).catch(() => {});
+        saveAddress(place, 'client').catch(() => {});
       }
     } catch (error) {
       Alert.alert(
@@ -320,6 +320,7 @@ export function BookServiceScreen({
 
       <ServiceLocationModal
         initialValue={draft.location}
+        scope="client"
         onClose={() => setLocationOpen(false)}
         onSelect={({ address, latitude, longitude }) => {
           update({ location: address, latitude, longitude });

@@ -1,3 +1,6 @@
+/** Recent addresses are kept separately per app mode. */
+export type AddressScope = 'client' | 'artisan';
+
 export type SavedAddress = Readonly<{
   id: string;
   /** Full formatted address, e.g. "12 Allen Ave, Ikeja, Lagos, Nigeria". */

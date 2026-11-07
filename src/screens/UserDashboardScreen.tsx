@@ -72,7 +72,7 @@ export function UserDashboardScreen() {
   // and left as-is when the user has never saved a location.
   useEffect(() => {
     let cancelled = false;
-    fetchRecentAddresses()
+    fetchRecentAddresses('client')
       .then(list => {
         const latest = list[0];
         if (cancelled || !latest) {
@@ -206,6 +206,7 @@ export function UserDashboardScreen() {
       <ChangeLocationModal
         onClose={() => setLocationPickerOpen(false)}
         onSelect={handleSelectLocation}
+        scope="client"
         visible={isLocationPickerOpen}
       />
     </DashboardShell>
