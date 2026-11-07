@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 
-import { fetchMyJobs } from '../../api/artisanJobs';
+import { acceptJob, declineJob, fetchMyJobs } from '../../api/artisanJobs';
 import { ApiError } from '../../api/client';
 import type { ArtisanJob } from '../../data/artisanJobs';
 
@@ -15,6 +15,38 @@ const initialState: ArtisanJobsState = {
   status: 'idle',
   error: null,
 };
+
+export const acceptArtisanJob = createAsyncThunk<
+  ArtisanJob,
+  string,
+  { rejectValue: string }
+>('artisanJobs/accept', async (id, { rejectWithValue }) => {
+  try {
+    return await acceptJob(id);
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof ApiError
+        ? error.message
+        : 'Unable to accept this booking.',
+    );
+  }
+});
+
+export const declineArtisanJob = createAsyncThunk<
+  ArtisanJob,
+  string,
+  { rejectValue: string }
+>('artisanJobs/decline', async (id, { rejectWithValue }) => {
+  try {
+    return await declineJob(id);
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof ApiError
+        ? error.message
+        : 'Unable to decline this booking.',
+    );
+  }
+});
 
 export const loadMyJobs = createAsyncThunk<
   ArtisanJob[],
@@ -55,12 +87,28 @@ const artisanJobsSlice = createSlice({
       .addCase(loadMyJobs.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload ?? 'Unable to load your jobs.';
-      });
+      })
+      .addCase(acceptArtisanJob.fulfilled, (state, action) => ({
+        ...state,
+        items: replaceJob(state.items, action.payload),
+      }))
+      .addCase(declineArtisanJob.fulfilled, (state, action) => ({
+        ...state,
+        items: replaceJob(state.items, action.payload),
+      }));
   },
 });
 
 export const { clearArtisanJobs } = artisanJobsSlice.actions;
 export const artisanJobsReducer = artisanJobsSlice.reducer;
+
+function replaceJob(items: ArtisanJob[], next: ArtisanJob): ArtisanJob[] {
+  const exists = items.some(job => job.id === next.id);
+  if (!exists) {
+    return [next, ...items];
+  }
+  return items.map(job => (job.id === next.id ? next : job));
+}
 
 type ArtisanJobsRoot = { artisanJobs: ArtisanJobsState };
 

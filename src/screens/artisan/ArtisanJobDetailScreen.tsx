@@ -34,6 +34,8 @@ import {
 } from '../../data/artisanJobs';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
+  acceptArtisanJob,
+  declineArtisanJob,
   loadMyJobs,
   selectArtisanJobById,
   selectArtisanJobsStatus,
@@ -58,25 +60,43 @@ export function ArtisanJobDetailScreen({
     selectArtisanJobById(state, route.params.jobId),
   );
   const loadStatus = useAppSelector(selectArtisanJobsStatus);
-  // Local override so accepting still flips the view before the server confirms.
-  const [statusOverride, setStatusOverride] = useState<ArtisanJobStatus | null>(
-    null,
-  );
-  const status = statusOverride ?? job?.status;
+  const status = job?.status;
+  const [isMenuOpen, setMenuOpen] = useState(false);
+  const [acting, setActing] = useState<'accept' | 'decline' | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!job && loadStatus === 'idle') {
       dispatch(loadMyJobs());
     }
   }, [dispatch, job, loadStatus]);
-  const [isMenuOpen, setMenuOpen] = useState(false);
 
-  const acceptBooking = () => {
+  const acceptBooking = async () => {
+    if (!job || acting) {
+      return;
+    }
     setMenuOpen(false);
-    setStatusOverride('accepted');
+    setActing('accept');
+    setActionError(null);
+    const result = await dispatch(acceptArtisanJob(job.id));
+    setActing(null);
+    if (acceptArtisanJob.rejected.match(result)) {
+      setActionError(result.payload ?? 'Unable to accept this booking.');
+    }
   };
-  const declineBooking = () => {
+  const declineBooking = async () => {
+    if (!job || acting) {
+      return;
+    }
     setMenuOpen(false);
+    setActing('decline');
+    setActionError(null);
+    const result = await dispatch(declineArtisanJob(job.id));
+    setActing(null);
+    if (declineArtisanJob.rejected.match(result)) {
+      setActionError(result.payload ?? 'Unable to decline this booking.');
+      return;
+    }
     navigation.goBack();
   };
   const messageClient = () => {
@@ -219,11 +239,17 @@ export function ArtisanJobDetailScreen({
         </View>
 
         <View style={styles.actions}>
+          {actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
           {isPending ? (
             <>
-              <PrimaryButton label="Accept booking" onPress={acceptBooking} />
+              <PrimaryButton
+                disabled={acting !== null}
+                label={acting === 'accept' ? 'Saving…' : 'Accept booking'}
+                onPress={acceptBooking}
+              />
               <OutlinedButton
-                label="Decline booking"
+                disabled={acting !== null}
+                label={acting === 'decline' ? 'Saving…' : 'Decline booking'}
                 onPress={declineBooking}
               />
             </>
@@ -322,12 +348,23 @@ function PrimaryButton({
   label,
   onPress,
   icon,
-}: Readonly<{ label: string; onPress: () => void; icon?: ReactNode }>) {
+  disabled = false,
+}: Readonly<{
+  label: string;
+  onPress: () => void;
+  icon?: ReactNode;
+  disabled?: boolean;
+}>) {
   return (
     <Pressable
       accessibilityRole="button"
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.primaryButton,
+        pressed && styles.pressed,
+        disabled && styles.disabled,
+      ]}
     >
       {icon}
       <Text style={styles.primaryLabel}>{label}</Text>
@@ -338,14 +375,17 @@ function PrimaryButton({
 function OutlinedButton({
   label,
   onPress,
-}: Readonly<{ label: string; onPress: () => void }>) {
+  disabled = false,
+}: Readonly<{ label: string; onPress: () => void; disabled?: boolean }>) {
   return (
     <Pressable
       accessibilityRole="button"
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.outlinedButton,
         pressed && styles.pressed,
+        disabled && styles.disabled,
       ]}
     >
       <Text style={styles.outlinedLabel}>{label}</Text>
@@ -526,6 +566,15 @@ const styles = StyleSheet.create({
   actions: {
     gap: 16,
     paddingTop: 8,
+  },
+  actionError: {
+    color: '#C44534',
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  disabled: {
+    opacity: 0.6,
   },
   primaryButton: {
     alignItems: 'center',
