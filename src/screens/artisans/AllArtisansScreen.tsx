@@ -256,6 +256,7 @@ export function AllArtisansScreen({
       />
 
       <ChangeLocationModal
+        scope="client"
         onClose={() => setLocationOpen(false)}
         onSelect={selection => {
           setLocation(

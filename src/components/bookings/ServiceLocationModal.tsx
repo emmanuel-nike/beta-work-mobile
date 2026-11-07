@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { saveAddress } from '../../api/addresses';
+import type { AddressScope } from '../../data/locations';
 import { useRecentAddresses } from '../../hooks/useRecentAddresses';
 import {
   autocompleteAddress,
@@ -47,6 +48,8 @@ export type SelectedLocation = Readonly<{
 type ServiceLocationModalProps = Readonly<{
   visible: boolean;
   initialValue?: string;
+  /** App mode the chosen address belongs to. */
+  scope: AddressScope;
   onClose: () => void;
   onSelect: (location: SelectedLocation) => void;
 }>;
@@ -54,11 +57,12 @@ type ServiceLocationModalProps = Readonly<{
 export function ServiceLocationModal({
   visible,
   initialValue,
+  scope,
   onClose,
   onSelect,
 }: ServiceLocationModalProps) {
   const insets = useSafeAreaInsets();
-  const recent = useRecentAddresses(visible);
+  const recent = useRecentAddresses(visible, scope);
   const [query, setQuery] = useState(initialValue ?? '');
   const [predictions, setPredictions] = useState<AddressPrediction[]>([]);
   const [isSearching, setSearching] = useState(false);
@@ -109,15 +113,18 @@ export function ServiceLocationModal({
   // Persist geocoded selections (best-effort) and hand the choice to the parent.
   const commit = (selection: SelectedLocation) => {
     if (selection.latitude !== null && selection.longitude !== null) {
-      saveAddress({
-        address: selection.address,
-        line1: selection.line1,
-        city: selection.city,
-        state: selection.state,
-        postalCode: selection.postalCode,
-        latitude: selection.latitude,
-        longitude: selection.longitude,
-      }).catch(() => {});
+      saveAddress(
+        {
+          address: selection.address,
+          line1: selection.line1,
+          city: selection.city,
+          state: selection.state,
+          postalCode: selection.postalCode,
+          latitude: selection.latitude,
+          longitude: selection.longitude,
+        },
+        scope,
+      ).catch(() => {});
     }
     onSelect(selection);
   };

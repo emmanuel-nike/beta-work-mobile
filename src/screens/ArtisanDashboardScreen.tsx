@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { fetchRecentAddresses } from '../api/addresses';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
@@ -70,6 +72,29 @@ export function ArtisanDashboardScreen({
   const [isLocationPickerOpen, setLocationPickerOpen] = useState(false);
   const [location, setLocation] = useState(DEFAULT_LOCATION_LABEL);
 
+  // On load, seed the header with the artisan's most recent saved location
+  // (its own scope), only while no location has been set this session.
+  useEffect(() => {
+    let cancelled = false;
+    fetchRecentAddresses('artisan')
+      .then(list => {
+        const latest = list[0];
+        if (cancelled || !latest) {
+          return;
+        }
+        const label = formatArea(latest) || latest.address;
+        if (label) {
+          setLocation(prev =>
+            prev === DEFAULT_LOCATION_LABEL ? label : prev,
+          );
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleSelectLocation = (selection: AddressSelection) => {
     setLocation(
       formatArea(selection) || selection.address || DEFAULT_LOCATION_LABEL,
@@ -96,6 +121,7 @@ export function ArtisanDashboardScreen({
       <ChangeLocationModal
         onClose={() => setLocationPickerOpen(false)}
         onSelect={handleSelectLocation}
+        scope="artisan"
         visible={isLocationPickerOpen}
       />
     </>

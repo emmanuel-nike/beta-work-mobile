@@ -1,4 +1,8 @@
-import type { AddressSelection, SavedAddress } from '../data/locations';
+import type {
+  AddressScope,
+  AddressSelection,
+  SavedAddress,
+} from '../data/locations';
 import { apiRequest } from './client';
 
 type ApiSavedAddress = Readonly<{
@@ -16,21 +20,26 @@ function toSavedAddress(api: ApiSavedAddress): SavedAddress {
   return { ...api, id: String(api.id) };
 }
 
-/** The authenticated user's recent addresses, newest first (max 10). */
-export async function fetchRecentAddresses(): Promise<SavedAddress[]> {
-  const { data } = await apiRequest<{ data: ApiSavedAddress[] }>('/addresses', {
-    method: 'GET',
-  });
+/** The user's recent addresses for a mode, newest first (max 10). */
+export async function fetchRecentAddresses(
+  scope: AddressScope,
+): Promise<SavedAddress[]> {
+  const query = new URLSearchParams({ scope }).toString();
+  const { data } = await apiRequest<{ data: ApiSavedAddress[] }>(
+    `/addresses?${query}`,
+    { method: 'GET' },
+  );
   return data.map(toSavedAddress);
 }
 
-/** Save a selected address; returns the updated recent list. */
+/** Save a selected address within a mode; returns the updated recent list. */
 export async function saveAddress(
   input: AddressSelection,
+  scope: AddressScope,
 ): Promise<SavedAddress[]> {
   const { data } = await apiRequest<{ data: ApiSavedAddress[] }>('/addresses', {
     method: 'POST',
-    body: input,
+    body: { ...input, scope },
   });
   return data.map(toSavedAddress);
 }
