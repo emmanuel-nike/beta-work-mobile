@@ -28,8 +28,11 @@ import {
   type TimelineStep,
 } from '../../data/bookings';
 import { CONVERSATIONS } from '../../data/messages';
-import { useAppSelector } from '../../store/hooks';
-import { selectBookingById } from '../../store/slices/bookingsSlice';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import {
+  completeMyBooking,
+  selectBookingById,
+} from '../../store/slices/bookingsSlice';
 import { bookingColors } from '../../theme/bookings';
 import type { AuthStackScreenProps } from '../../navigation/types';
 
@@ -60,7 +63,11 @@ export function BookingDetailsScreen({
     selectBookingById(state, route.params.bookingId),
   );
   const booking = storedBooking ?? findBooking(route.params.bookingId);
+  const dispatch = useAppDispatch();
   const [cancelled, setCancelled] = useState(false);
+  const [completed, setCompleted] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
 
   if (!booking) {
     return (
@@ -97,6 +104,23 @@ export function BookingDetailsScreen({
     if (conversation) {
       navigation.navigate('Chat', { conversationId: conversation.id });
     }
+  }
+
+  async function markCompleted() {
+    if (!booking || completing) {
+      return;
+    }
+    setCompleting(true);
+    setCompleteError(null);
+    const result = await dispatch(completeMyBooking(booking.id));
+    setCompleting(false);
+    if (completeMyBooking.rejected.match(result)) {
+      setCompleteError(
+        result.payload ?? 'Unable to mark this booking as completed.',
+      );
+      return;
+    }
+    setCompleted(true);
   }
 
   return (
@@ -165,10 +189,15 @@ export function BookingDetailsScreen({
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+        {completeError ? (
+          <Text style={styles.footerError}>{completeError}</Text>
+        ) : null}
         <BookingActions
           booking={booking}
+          completing={completing}
           onBookAgain={() => openBookingForm(false)}
           onCancel={() => setCancelled(true)}
+          onComplete={markCompleted}
           onDispute={() =>
             navigation.navigate('RaiseDispute', { bookingId: booking.id })
           }
@@ -187,22 +216,33 @@ export function BookingDetailsScreen({
         title="Booking cancelled"
         visible={cancelled}
       />
+
+      <SuccessModal
+        message="Thanks for confirming. This job is now marked as completed."
+        onClose={() => setCompleted(false)}
+        title="Job completed"
+        visible={completed}
+      />
     </View>
   );
 }
 
 type BookingActionsProps = Readonly<{
   booking: Booking;
+  completing: boolean;
   onBookAgain: () => void;
   onCancel: () => void;
+  onComplete: () => void;
   onDispute: () => void;
   onReview: () => void;
 }>;
 
 function BookingActions({
   booking,
+  completing,
   onBookAgain,
   onCancel,
+  onComplete,
   onDispute,
   onReview,
 }: BookingActionsProps) {
@@ -225,13 +265,16 @@ function BookingActions({
         </BookingButton>
       ) : null}
 
-      {booking.status === 'ongoing' ? (
+      {booking.status === 'accepted' || booking.status === 'ongoing' ? (
         <BookingButton
-          disabled={!booking.awaitingConfirmation}
-          onPress={() => {}}
+          disabled={
+            completing ||
+            (booking.status === 'ongoing' && !booking.awaitingConfirmation)
+          }
+          onPress={onComplete}
           style={styles.footerButton}
         >
-          Mark as completed
+          {completing ? 'Marking as completed…' : 'Mark as completed'}
         </BookingButton>
       ) : null}
 
@@ -679,6 +722,12 @@ const styles = StyleSheet.create({
   },
   footerButton: {
     height: 48,
+  },
+  footerError: {
+    color: bookingColors.danger,
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   pressed: {
     opacity: 0.75,

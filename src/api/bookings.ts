@@ -96,6 +96,15 @@ export async function updateBooking(id: string, input: UpdateBookingInput): Prom
   return toBooking(booking)
 }
 
+/** Mark an accepted or ongoing booking as completed; returns the updated booking. */
+export async function completeBooking(id: string): Promise<Booking> {
+  const { booking } = await apiRequest<{ booking: ApiBooking }>(
+    `/bookings/${encodeURIComponent(id)}/complete`,
+    { method: 'POST' }
+  )
+  return toBooking(booking)
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 /** Format an ISO timestamp as "Nov 21 • 11:00 AM" without relying on Intl. */

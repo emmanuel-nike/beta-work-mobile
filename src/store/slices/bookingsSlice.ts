@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 
 import {
+  completeBooking,
   createBooking,
   fetchMyBookings,
   updateBooking,
@@ -70,6 +71,22 @@ export const editBooking = createAsyncThunk<
   }
 });
 
+export const completeMyBooking = createAsyncThunk<
+  Booking,
+  string,
+  { rejectValue: string }
+>('bookings/complete', async (id, { rejectWithValue }) => {
+  try {
+    return await completeBooking(id);
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof ApiError
+        ? error.message
+        : 'Unable to mark this booking as completed.',
+    );
+  }
+});
+
 const bookingsSlice = createSlice({
   name: 'bookings',
   initialState,
@@ -107,6 +124,13 @@ const bookingsSlice = createSlice({
       }))
       // Replace the edited booking in place so the details screen reflects it.
       .addCase(editBooking.fulfilled, (state, action) => ({
+        ...state,
+        items: state.items.map(booking =>
+          booking.id === action.payload.id ? action.payload : booking,
+        ),
+      }))
+      // Replace the completed booking in place so the details screen reflects it.
+      .addCase(completeMyBooking.fulfilled, (state, action) => ({
         ...state,
         items: state.items.map(booking =>
           booking.id === action.payload.id ? action.payload : booking,
