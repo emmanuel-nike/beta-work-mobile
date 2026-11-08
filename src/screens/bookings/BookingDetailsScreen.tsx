@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BookingButton } from '../../components/bookings/BookingButton';
+import { ConfirmModal } from '../../components/bookings/ConfirmModal';
 import { StatusTimeline } from '../../components/bookings/StatusTimeline';
 import { SuccessModal } from '../../components/bookings/SuccessModal';
 import {
@@ -28,8 +29,11 @@ import {
   type TimelineStep,
 } from '../../data/bookings';
 import { CONVERSATIONS } from '../../data/messages';
-import { useAppSelector } from '../../store/hooks';
-import { selectBookingById } from '../../store/slices/bookingsSlice';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import {
+  completeMyBooking,
+  selectBookingById,
+} from '../../store/slices/bookingsSlice';
 import { bookingColors } from '../../theme/bookings';
 import type { AuthStackScreenProps } from '../../navigation/types';
 
@@ -60,7 +64,12 @@ export function BookingDetailsScreen({
     selectBookingById(state, route.params.bookingId),
   );
   const booking = storedBooking ?? findBooking(route.params.bookingId);
+  const dispatch = useAppDispatch();
   const [cancelled, setCancelled] = useState(false);
+  const [completed, setCompleted] = useState(false);
+  const [confirmingComplete, setConfirmingComplete] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
 
   if (!booking) {
     return (
@@ -97,6 +106,29 @@ export function BookingDetailsScreen({
     if (conversation) {
       navigation.navigate('Chat', { conversationId: conversation.id });
     }
+  }
+
+  async function markCompleted() {
+    if (!booking || completing) {
+      return;
+    }
+    setCompleting(true);
+    setCompleteError(null);
+    const result = await dispatch(completeMyBooking(booking.id));
+    setCompleting(false);
+    if (completeMyBooking.rejected.match(result)) {
+      setCompleteError(
+        result.payload ?? 'Unable to mark this booking as completed.',
+      );
+      return;
+    }
+    setConfirmingComplete(false);
+    setCompleted(true);
+  }
+
+  function requestComplete() {
+    setCompleteError(null);
+    setConfirmingComplete(true);
   }
 
   return (
@@ -167,8 +199,10 @@ export function BookingDetailsScreen({
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <BookingActions
           booking={booking}
+          completing={completing}
           onBookAgain={() => openBookingForm(false)}
           onCancel={() => setCancelled(true)}
+          onComplete={requestComplete}
           onDispute={() =>
             navigation.navigate('RaiseDispute', { bookingId: booking.id })
           }
@@ -187,22 +221,48 @@ export function BookingDetailsScreen({
         title="Booking cancelled"
         visible={cancelled}
       />
+
+      <ConfirmModal
+        busy={completing}
+        busyLabel="Marking as completed…"
+        confirmLabel="Yes, mark completed"
+        error={completeError}
+        message="Only do this once the artisan has finished the job. This confirms the work is done and cannot be undone."
+        onCancel={() => {
+          setConfirmingComplete(false);
+          setCompleteError(null);
+        }}
+        onConfirm={markCompleted}
+        title="Mark this job as completed?"
+        visible={confirmingComplete}
+      />
+
+      <SuccessModal
+        message="Thanks for confirming. This job is now marked as completed."
+        onClose={() => setCompleted(false)}
+        title="Job completed"
+        visible={completed}
+      />
     </View>
   );
 }
 
 type BookingActionsProps = Readonly<{
   booking: Booking;
+  completing: boolean;
   onBookAgain: () => void;
   onCancel: () => void;
+  onComplete: () => void;
   onDispute: () => void;
   onReview: () => void;
 }>;
 
 function BookingActions({
   booking,
+  completing,
   onBookAgain,
   onCancel,
+  onComplete,
   onDispute,
   onReview,
 }: BookingActionsProps) {
@@ -225,10 +285,13 @@ function BookingActions({
         </BookingButton>
       ) : null}
 
-      {booking.status === 'ongoing' ? (
+      {booking.status === 'accepted' || booking.status === 'ongoing' ? (
         <BookingButton
-          disabled={!booking.awaitingConfirmation}
-          onPress={() => {}}
+          disabled={
+            completing ||
+            (booking.status === 'ongoing' && !booking.awaitingConfirmation)
+          }
+          onPress={onComplete}
           style={styles.footerButton}
         >
           Mark as completed
