@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BookingButton } from '../../components/bookings/BookingButton';
+import { ConfirmModal } from '../../components/bookings/ConfirmModal';
 import { StatusTimeline } from '../../components/bookings/StatusTimeline';
 import { SuccessModal } from '../../components/bookings/SuccessModal';
 import {
@@ -66,6 +67,7 @@ export function BookingDetailsScreen({
   const dispatch = useAppDispatch();
   const [cancelled, setCancelled] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [confirmingComplete, setConfirmingComplete] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
 
@@ -120,7 +122,13 @@ export function BookingDetailsScreen({
       );
       return;
     }
+    setConfirmingComplete(false);
     setCompleted(true);
+  }
+
+  function requestComplete() {
+    setCompleteError(null);
+    setConfirmingComplete(true);
   }
 
   return (
@@ -189,15 +197,12 @@ export function BookingDetailsScreen({
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        {completeError ? (
-          <Text style={styles.footerError}>{completeError}</Text>
-        ) : null}
         <BookingActions
           booking={booking}
           completing={completing}
           onBookAgain={() => openBookingForm(false)}
           onCancel={() => setCancelled(true)}
-          onComplete={markCompleted}
+          onComplete={requestComplete}
           onDispute={() =>
             navigation.navigate('RaiseDispute', { bookingId: booking.id })
           }
@@ -215,6 +220,21 @@ export function BookingDetailsScreen({
         }}
         title="Booking cancelled"
         visible={cancelled}
+      />
+
+      <ConfirmModal
+        busy={completing}
+        busyLabel="Marking as completed…"
+        confirmLabel="Yes, mark completed"
+        error={completeError}
+        message="Only do this once the artisan has finished the job. This confirms the work is done and cannot be undone."
+        onCancel={() => {
+          setConfirmingComplete(false);
+          setCompleteError(null);
+        }}
+        onConfirm={markCompleted}
+        title="Mark this job as completed?"
+        visible={confirmingComplete}
       />
 
       <SuccessModal
@@ -274,7 +294,7 @@ function BookingActions({
           onPress={onComplete}
           style={styles.footerButton}
         >
-          {completing ? 'Marking as completed…' : 'Mark as completed'}
+          Mark as completed
         </BookingButton>
       ) : null}
 
@@ -722,12 +742,6 @@ const styles = StyleSheet.create({
   },
   footerButton: {
     height: 48,
-  },
-  footerError: {
-    color: bookingColors.danger,
-    fontSize: 13,
-    fontWeight: '500',
-    textAlign: 'center',
   },
   pressed: {
     opacity: 0.75,
