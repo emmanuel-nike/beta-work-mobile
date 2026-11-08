@@ -185,7 +185,11 @@ export function DashboardHeader({
             ]}
           >
             <LocationIcon />
-            <Text style={styles.locationText}>{location}</Text>
+            <Text style={styles.locationText}>
+              {location.length > 18
+                ? `${location.slice(0, 18).trimEnd()}...`
+                : location}
+            </Text>
             <ChevronDownIcon />
           </Pressable>
           <Pressable
@@ -334,7 +338,11 @@ type SectionHeaderProps = Readonly<{
   onAction?: () => void;
 }>;
 
-export function SectionHeader({ title, actionLabel, onAction }: SectionHeaderProps) {
+export function SectionHeader({
+  title,
+  actionLabel,
+  onAction,
+}: SectionHeaderProps) {
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
