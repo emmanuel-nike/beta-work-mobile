@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 
+import { useNotifications } from './src/hooks/useNotifications';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { store } from './src/store';
 import { bootstrapAuth } from './src/store/slices/authSlice';
@@ -12,6 +13,9 @@ function AppBootstrap() {
   useEffect(() => {
     store.dispatch(bootstrapAuth());
   }, []);
+
+  // Start push + live updates once authenticated; tear down on sign-out.
+  useNotifications();
 
   return <RootNavigator />;
 }

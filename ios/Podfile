@@ -8,6 +8,10 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
+# Build the Firebase SDK as a static framework so @react-native-firebase links
+# cleanly with the default (non-use_frameworks) static-library setup.
+$RNFirebaseAsStaticFramework = true
+
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
@@ -16,6 +20,14 @@ end
 
 target 'BetaWork' do
   config = use_native_modules!
+
+  # Firebase's Swift pods (FirebaseCoreInternal, etc.) require these C/ObjC
+  # dependencies to expose module maps when Firebase is linked as a static
+  # framework ($RNFirebaseAsStaticFramework above).
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'FirebaseCoreInternal', :modular_headers => true
+  pod 'GoogleDataTransport', :modular_headers => true
+  pod 'nanopb', :modular_headers => true
 
   use_react_native!(
     :path => config[:reactNativePath],
