@@ -1,5 +1,11 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentProps,
+} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -100,7 +106,7 @@ export function ArtisanJobsScreen() {
           })}
         </ScrollView>
       )}
-      <View style={{ flex: 1 }}>
+      <View style={styles.fill}>
         {isInitialLoading ? (
           <View style={styles.loading}>
             <ActivityIndicator color={dashboardColors.tabBar} />
@@ -114,6 +120,7 @@ export function ArtisanJobsScreen() {
                 refreshing={refreshing}
               />
             }
+            style={styles.fill}
           >
             <AllEmptyState
               message={loadStatus === 'failed' ? loadError : null}
@@ -128,6 +135,7 @@ export function ArtisanJobsScreen() {
                 refreshing={refreshing}
               />
             }
+            style={styles.fill}
           >
             <CategoryEmptyState filter={filter} />
           </ScrollView>
@@ -159,9 +167,14 @@ export function ArtisanJobsScreen() {
 function JobsRefreshControl({
   refreshing,
   onRefresh,
-}: Readonly<{ refreshing: boolean; onRefresh: () => void }>) {
+  ...rest
+}: Readonly<ComponentProps<typeof RefreshControl>>) {
+  // On Android the list is mounted as a child of the refresh control, and the
+  // layout style is passed in the same props. Dropping them removes the list
+  // and leaves only the category chips. iOS renders the list separately.
   return (
     <RefreshControl
+      {...rest}
       colors={[dashboardColors.tabBar]}
       onRefresh={onRefresh}
       refreshing={refreshing}
@@ -241,6 +254,9 @@ const styles = StyleSheet.create({
     color: dashboardColors.white,
     fontWeight: '600',
   },
+  fill: {
+    flex: 1,
+  },
   listContent: {
     gap: 12,
     paddingHorizontal: 24,
@@ -289,9 +305,9 @@ const styles = StyleSheet.create({
   },
   categoryEmptyCard: {
     alignItems: 'center',
+    alignSelf: 'stretch',
     backgroundColor: dashboardColors.card,
     borderRadius: 8,
-    gap: 8,
     paddingVertical: 28,
   },
   categoryIcon: {
@@ -300,7 +316,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     height: 48,
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 12,
     width: 48,
   },
   categoryTitle: {
@@ -308,6 +324,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
+    marginBottom: 8,
   },
   categoryBody: {
     color: dashboardColors.textSecondary,

@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { PermissionsAndroid, Platform } from 'react-native';
 import messaging, {
   FirebaseMessagingTypes,
 } from '@react-native-firebase/messaging';
@@ -9,12 +9,36 @@ import { handleNotificationEvent, NotificationEvent } from './events';
 let currentToken: string | null = null;
 let listeners: Array<() => void> = [];
 
+/** Runtime notification permission exists from Android 13 (API 33). */
+const ANDROID_POST_NOTIFICATIONS_API = 33;
+
 /** The FCM token for this device, if one has been obtained. */
 export function getCurrentPushToken(): string | null {
   return currentToken;
 }
 
+/**
+ * Ask the OS for permission to show notifications.
+ *
+ * `@react-native-firebase/messaging`'s `requestPermission()` is iOS-only: on
+ * Android it resolves `AUTHORIZED` immediately and never shows a dialog. This
+ * app targets SDK 35, so Android 13+ will not display any notification until
+ * `POST_NOTIFICATIONS` is granted at runtime.
+ */
 async function hasPermission(): Promise<boolean> {
+  if (Platform.OS === 'android') {
+    if (Number(Platform.Version) < ANDROID_POST_NOTIFICATIONS_API) {
+      return true;
+    }
+    const permission = PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS;
+    const alreadyGranted = await PermissionsAndroid.check(permission);
+    if (alreadyGranted) {
+      return true;
+    }
+    const result = await PermissionsAndroid.request(permission);
+    return result === PermissionsAndroid.RESULTS.GRANTED;
+  }
+
   const status = await messaging().requestPermission();
   return (
     status === messaging.AuthorizationStatus.AUTHORIZED ||
