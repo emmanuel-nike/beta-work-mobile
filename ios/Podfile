@@ -21,12 +21,18 @@ end
 target 'BetaWork' do
   config = use_native_modules!
 
-  # Firebase's Swift pods (FirebaseCoreInternal, etc.) require these C/ObjC
-  # dependencies to expose module maps when Firebase is linked as a static
-  # framework ($RNFirebaseAsStaticFramework above).
-  pod 'GoogleUtilities', :modular_headers => true
+  # Firebase is linked as a static framework ($RNFirebaseAsStaticFramework
+  # above), so every Firebase/Google ObjC pod it `@import`s must expose a
+  # clang module map. Cover the whole chain (FirebaseMessaging imports
+  # FirebaseCore, etc.) so the modules resolve.
+  pod 'FirebaseCore', :modular_headers => true
   pod 'FirebaseCoreInternal', :modular_headers => true
+  pod 'FirebaseCoreExtension', :modular_headers => true
+  pod 'FirebaseInstallations', :modular_headers => true
+  pod 'FirebaseMessaging', :modular_headers => true
+  pod 'GoogleUtilities', :modular_headers => true
   pod 'GoogleDataTransport', :modular_headers => true
+  pod 'PromisesObjC', :modular_headers => true
   pod 'nanopb', :modular_headers => true
 
   use_react_native!(
@@ -43,5 +49,14 @@ target 'BetaWork' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Giving the Firebase pods modular headers turns on module builds for the
+    # Pods project, which makes React's C++ (non-modular) includes fail under
+    # -Werror=non-modular-include-in-framework-module. Allow them across pods.
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      end
+    end
   end
 end
