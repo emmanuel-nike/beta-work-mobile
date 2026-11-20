@@ -44,7 +44,10 @@ export function BookingCard({ booking, onPress }: BookingCardProps) {
   );
 }
 
-function DetailLine({ label, value }: Readonly<{ label: string; value: string }>) {
+function DetailLine({
+  label,
+  value,
+}: Readonly<{ label: string; value: string }>) {
   return (
     <Text numberOfLines={1} style={styles.detailValue}>
       <Text style={styles.detailLabel}>{label} </Text>
@@ -55,8 +58,8 @@ function DetailLine({ label, value }: Readonly<{ label: string; value: string }>
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: bookingColors.card,
-    borderColor: bookingColors.cardBorder,
+    backgroundColor: '#FCF7EC',
+    borderColor: '#E5D9C1',
     borderRadius: 8,
     borderWidth: 1,
     gap: 16,
