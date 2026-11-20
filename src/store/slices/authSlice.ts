@@ -245,6 +245,12 @@ export const submitArtisanPortfolio = createAsyncThunk<
 });
 
 export const logoutUser = createAsyncThunk('auth/logout', async () => {
+  // Unregister this device's push token and tear down listeners while the auth
+  // token is still valid, before the server invalidates it on logout. Loaded
+  // lazily to avoid a store <-> notifications import cycle.
+  const notifications = await import('../../services/notifications');
+  await notifications.unregisterCurrentDevice();
+  notifications.teardownNotifications();
   try {
     await logoutRequest();
   } catch {

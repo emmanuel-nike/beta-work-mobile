@@ -93,3 +93,7 @@ Figma_Exports/Client_Artisan_Bookings_Old/6-Raise a dispute.svg
 Figma_Exports/Client_Artisan_Bookings_Old/Feedback.svg
 Figma_Exports/Client_Artisan_Bookings_Old/Success Modal.svg
 Figma_Exports/*
+
+# Firebase config files (add from the Firebase console — see docs/notifications-setup.md)
+android/app/google-services.json
+ios/BetaWork/GoogleService-Info.plist
